@@ -44,7 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // It fires immediately with the current session (INITIAL_SESSION event).
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+    } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       if (!mounted) return
 
       setSession(newSession)
