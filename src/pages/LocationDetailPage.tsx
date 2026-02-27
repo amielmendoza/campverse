@@ -59,10 +59,12 @@ export function LocationDetailPage() {
     useLocationMembers(location?.id)
 
   const [actionLoading, setActionLoading] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
 
   const handleJoin = async () => {
     if (!location) return
     setActionLoading(true)
+    setActionError(null)
     try {
       await join(location.id)
       setLocation((prev) =>
@@ -70,6 +72,7 @@ export function LocationDetailPage() {
       )
     } catch (err) {
       console.error('Failed to join:', err)
+      setActionError(err instanceof Error ? err.message : 'Failed to join location.')
     } finally {
       setActionLoading(false)
     }
@@ -78,6 +81,7 @@ export function LocationDetailPage() {
   const handleLeave = async () => {
     if (!location) return
     setActionLoading(true)
+    setActionError(null)
     try {
       await leave(location.id)
       setLocation((prev) =>
@@ -85,6 +89,7 @@ export function LocationDetailPage() {
       )
     } catch (err) {
       console.error('Failed to leave:', err)
+      setActionError(err instanceof Error ? err.message : 'Failed to leave location.')
     } finally {
       setActionLoading(false)
     }
@@ -118,6 +123,12 @@ export function LocationDetailPage() {
           &larr; All Locations
         </Link>
       </div>
+
+      {actionError && (
+        <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+          {actionError}
+        </div>
+      )}
 
       <LocationDetail
         location={location}

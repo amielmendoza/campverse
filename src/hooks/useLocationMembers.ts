@@ -1,7 +1,19 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { debounce } from '../lib/utils/debounce'
 
+interface MembershipRow {
+  id: string
+  user_id: string
+  location_id: string
+  joined_at: string
+  profiles: {
+    username: string
+    display_name: string | null
+    avatar_url: string | null
+  } | null
+}
 
 export interface LocationMember {
   id: string
@@ -20,6 +32,7 @@ export function useLocationMembers(locationId: string | undefined) {
   const [members, setMembers] = useState<LocationMember[]>([])
   const [loading, setLoading] = useState(true)
   const [isMember, setIsMember] = useState(false)
+  const hasFetchedOnce = useRef(false)
 
   const fetchMembers = useCallback(async () => {
     if (!locationId) {
@@ -28,7 +41,7 @@ export function useLocationMembers(locationId: string | undefined) {
       return
     }
 
-    setLoading(true)
+    if (!hasFetchedOnce.current) setLoading(true)
 
     try {
       const { data, error } = await supabase
@@ -48,7 +61,7 @@ export function useLocationMembers(locationId: string | undefined) {
 
       if (error) throw error
 
-      const mapped: LocationMember[] = (data ?? []).map((row: any) => ({
+      const mapped: LocationMember[] = (data ?? []).map((row: MembershipRow) => ({
         id: row.id,
         user_id: row.user_id,
         location_id: row.location_id,
@@ -62,20 +75,32 @@ export function useLocationMembers(locationId: string | undefined) {
 
       setMembers(mapped)
       setIsMember(user ? mapped.some((m) => m.user_id === user.id) : false)
-    } catch (err) {
-      console.error('Error fetching location members:', err)
+    } catch (err: unknown) {
+      console.error('Error fetching location members:', err instanceof Error ? err.message : err)
     } finally {
+      hasFetchedOnce.current = true
       setLoading(false)
     }
   }, [locationId, user])
 
+  // Debounced refetch for realtime callbacks (300ms)
+  const debouncedFetch = useMemo(() => debounce(fetchMembers, 300), [fetchMembers])
+
+  // Reset when location changes
+  useEffect(() => {
+    hasFetchedOnce.current = false
+  }, [locationId])
+
+  // Initial load
   useEffect(() => {
     fetchMembers()
   }, [fetchMembers])
 
-  // Subscribe to realtime changes on memberships
+  // Realtime subscription with polling fallback
   useEffect(() => {
     if (!locationId) return
+
+    let realtimeWorking = false
 
     const channel = supabase
       .channel(`memberships:${locationId}`)
@@ -88,7 +113,8 @@ export function useLocationMembers(locationId: string | undefined) {
           filter: `location_id=eq.${locationId}`,
         },
         () => {
-          fetchMembers()
+          realtimeWorking = true
+          debouncedFetch()
         },
       )
       .on(
@@ -98,16 +124,28 @@ export function useLocationMembers(locationId: string | undefined) {
           schema: 'public',
           table: 'location_memberships',
         },
-        () => {
-          fetchMembers()
+        (payload) => {
+          // Supabase Realtime does not support column filters on DELETE events,
+          // so we subscribe to all DELETEs and check the location_id manually.
+          const old = payload.old as Record<string, unknown>
+          if (old.location_id !== locationId) return
+          realtimeWorking = true
+          debouncedFetch()
         },
       )
       .subscribe()
 
+    // Polling fallback: only polls if Realtime isn't working
+    const pollInterval = setInterval(() => {
+      if (realtimeWorking) return
+      fetchMembers()
+    }, 10000)
+
     return () => {
+      clearInterval(pollInterval)
       supabase.removeChannel(channel)
     }
-  }, [locationId, fetchMembers])
+  }, [locationId, fetchMembers, debouncedFetch])
 
   const join = useCallback(
     async (locId: string) => {

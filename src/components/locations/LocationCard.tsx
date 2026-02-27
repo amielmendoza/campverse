@@ -1,11 +1,14 @@
 import { Link } from 'react-router-dom'
 import type { LocationWithCount } from '../../hooks/useLocations'
+import { normalizeAmenities } from '../../lib/utils/amenities'
 
 interface LocationCardProps {
   location: LocationWithCount
 }
 
 export function LocationCard({ location }: LocationCardProps) {
+  const amenities = normalizeAmenities(location.amenities)
+
   return (
     <Link
       to={`/locations/${location.slug}`}
@@ -16,6 +19,7 @@ export function LocationCard({ location }: LocationCardProps) {
           <img
             src={location.image_url}
             alt={location.name}
+            loading="lazy"
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
         ) : (
@@ -62,19 +66,19 @@ export function LocationCard({ location }: LocationCardProps) {
               </a>
             )}
           </div>
-          {location.amenities && location.amenities.length > 0 && (
+          {amenities.length > 0 && (
             <div className="flex flex-wrap justify-end gap-1">
-              {location.amenities.slice(0, 3).map((amenity: any, i: number) => (
+              {amenities.slice(0, 3).map((amenity, i) => (
                 <span
                   key={i}
                   className="rounded bg-stone-100 px-1.5 py-0.5 text-xs text-stone-500"
                 >
-                  {typeof amenity === 'string' ? amenity : amenity.name}
+                  {amenity.name}
                 </span>
               ))}
-              {location.amenities.length > 3 && (
+              {amenities.length > 3 && (
                 <span className="rounded bg-stone-100 px-1.5 py-0.5 text-xs text-stone-400">
-                  +{location.amenities.length - 3}
+                  +{amenities.length - 3}
                 </span>
               )}
             </div>

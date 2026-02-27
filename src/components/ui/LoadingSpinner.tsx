@@ -10,10 +10,11 @@ const sizeClasses = {
 
 export function LoadingSpinner({ size = 'md' }: LoadingSpinnerProps) {
   return (
-    <div className="flex items-center justify-center p-8">
+    <div className="flex items-center justify-center p-8" role="status" aria-label="Loading">
       <div
         className={`${sizeClasses[size]} animate-spin rounded-full border-4 border-stone-200 border-t-emerald-600`}
       />
+      <span className="sr-only">Loading</span>
     </div>
   )
 }

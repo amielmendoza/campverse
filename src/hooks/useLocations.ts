@@ -53,9 +53,9 @@ export function useLocations() {
       }))
 
       setLocations(locationsWithCounts)
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Locations fetch error:', err)
-      setError(err?.message ?? 'Failed to fetch locations')
+      setError(err instanceof Error ? err.message : 'Failed to fetch locations')
     } finally {
       setLoading(false)
     }

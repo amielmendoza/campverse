@@ -1,14 +1,10 @@
 import type { MessageWithProfile } from '../../hooks/useMessages'
 import { Avatar } from '../ui/Avatar'
+import { formatTime } from '../../lib/utils/dates'
 
 interface MessageBubbleProps {
   message: MessageWithProfile
   isOwn: boolean
-}
-
-function formatTime(dateStr: string): string {
-  const date = new Date(dateStr)
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
 export function MessageBubble({ message, isOwn }: MessageBubbleProps) {

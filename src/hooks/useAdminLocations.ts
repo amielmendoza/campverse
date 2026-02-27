@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { generateSlug } from '../lib/utils/slug'
 import type { Location, AmenityItem } from '../lib/types'
 
 export interface LocationFormData {
@@ -14,16 +15,6 @@ export interface LocationFormData {
   gallery: string[]
   capacity: number | null
   is_active: boolean
-}
-
-function generateSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9-]/g, '')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
 }
 
 export function useAdminLocations() {
@@ -44,9 +35,9 @@ export function useAdminLocations() {
       if (fetchError) throw fetchError
 
       setLocations(data ?? [])
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Admin locations fetch error:', err)
-      setError(err?.message ?? 'Failed to fetch locations')
+      setError(err instanceof Error ? err.message : 'Failed to fetch locations')
     } finally {
       setLoading(false)
     }
@@ -108,8 +99,6 @@ export function useAdminLocations() {
       } else if (data.name) {
         updateData.slug = generateSlug(data.name)
       }
-
-      console.log('Updating location with:', JSON.stringify(updateData, null, 2))
 
       const { error: updateError } = await supabase
         .from('locations')

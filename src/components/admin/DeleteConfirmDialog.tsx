@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useFocusTrap } from '../../lib/utils/useFocusTrap'
 
 interface DeleteConfirmDialogProps {
   isOpen: boolean
@@ -14,20 +15,31 @@ export function DeleteConfirmDialog({
   onCancel,
 }: DeleteConfirmDialogProps) {
   const [deleting, setDeleting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const trapRef = useFocusTrap(isOpen)
 
   if (!isOpen) return null
 
   async function handleConfirm() {
     setDeleting(true)
+    setError(null)
     try {
       await onConfirm()
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to delete. Please try again.')
     } finally {
       setDeleting(false)
     }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div
+      ref={trapRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="delete-dialog-title"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+    >
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50"
@@ -53,7 +65,7 @@ export function DeleteConfirmDialog({
           </svg>
         </div>
 
-        <h3 className="mb-2 text-center text-lg font-semibold text-stone-900">
+        <h3 id="delete-dialog-title" className="mb-2 text-center text-lg font-semibold text-stone-900">
           Delete Location
         </h3>
 
@@ -63,6 +75,12 @@ export function DeleteConfirmDialog({
           This will also delete all memberships and messages for this location.
           This action cannot be undone.
         </p>
+
+        {error && (
+          <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
 
         <div className="flex gap-3">
           <button

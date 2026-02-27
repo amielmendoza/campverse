@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { LocationWithCount } from '../../hooks/useLocations'
 import type { AmenityItem } from '../../lib/types'
+import { normalizeAmenities, normalizeGallery } from '../../lib/utils/amenities'
+import { CloseIcon } from '../ui/CloseIcon'
 
 interface LocationDetailProps {
   location: LocationWithCount
@@ -24,17 +26,8 @@ export function LocationDetail({
 }: LocationDetailProps) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
 
-  const amenities: AmenityItem[] = Array.isArray(location.amenities)
-    ? location.amenities.map((a: any) =>
-        typeof a === 'string'
-          ? { name: a, image_url: '' }
-          : { name: a.name ?? '', image_url: a.image_url ?? '' }
-      )
-    : []
-
-  const gallery: string[] = Array.isArray((location as any).gallery)
-    ? (location as any).gallery.filter((url: any) => typeof url === 'string' && url)
-    : []
+  const amenities: AmenityItem[] = normalizeAmenities(location.amenities)
+  const gallery: string[] = normalizeGallery(location.gallery)
 
   // Build unified lightbox list: gallery photos first, then amenity images
   const lightboxImages: LightboxImage[] = [
@@ -121,6 +114,7 @@ export function LocationDetail({
               <img
                 src={url}
                 alt={`Photo ${index + 1}`}
+                loading="lazy"
                 className="h-full w-full object-cover transition-opacity hover:opacity-80"
               />
             </button>
@@ -205,6 +199,7 @@ export function LocationDetail({
                       <img
                         src={amenity.image_url}
                         alt={amenity.name}
+                        loading="lazy"
                         className="h-full w-full object-cover transition-transform duration-200 hover:scale-110"
                       />
                     </button>
@@ -230,6 +225,9 @@ export function LocationDetail({
       {/* Lightbox modal */}
       {currentImage && (
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="lightbox-label"
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
           onClick={() => setLightboxIndex(null)}
         >
@@ -239,9 +237,7 @@ export function LocationDetail({
             onClick={() => setLightboxIndex(null)}
             className="absolute right-4 top-4 z-10 rounded-full bg-black/40 p-2 text-white transition-colors hover:bg-black/60"
           >
-            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-            </svg>
+            <CloseIcon className="h-6 w-6" />
           </button>
 
           {/* Prev button */}
@@ -268,7 +264,7 @@ export function LocationDetail({
               className="max-h-[75vh] w-full object-contain"
             />
             <div className="px-4 py-3 text-center">
-              <p className="text-sm font-semibold text-stone-800">{currentImage.label}</p>
+              <p id="lightbox-label" className="text-sm font-semibold text-stone-800">{currentImage.label}</p>
               <p className="text-xs text-stone-400">
                 {lightboxIndex! + 1} / {lightboxImages.length}
               </p>

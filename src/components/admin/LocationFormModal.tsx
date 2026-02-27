@@ -2,22 +2,17 @@ import { useEffect, useState, type FormEvent } from 'react'
 import type { Location } from '../../lib/types'
 import type { AmenityItem } from '../../lib/types'
 import type { LocationFormData } from '../../hooks/useAdminLocations'
+import { generateSlug } from '../../lib/utils/slug'
+import { normalizeAmenities, normalizeGallery } from '../../lib/utils/amenities'
+import { inputClassName, labelClassName } from '../../lib/utils/styles'
+import { useFocusTrap } from '../../lib/utils/useFocusTrap'
+import { CloseIcon } from '../ui/CloseIcon'
 
 interface LocationFormModalProps {
   isOpen: boolean
   onClose: () => void
   onSubmit: (data: LocationFormData) => Promise<void>
   initialData?: Location | null
-}
-
-function generateSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9-]/g, '')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
 }
 
 export function LocationFormModal({
@@ -27,6 +22,7 @@ export function LocationFormModal({
   initialData,
 }: LocationFormModalProps) {
   const isEditMode = !!initialData
+  const trapRef = useFocusTrap(isOpen)
 
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
@@ -54,20 +50,8 @@ export function LocationFormModal({
       setRegion(initialData.region ?? '')
       setLatitude(initialData.latitude != null ? String(initialData.latitude) : '')
       setLongitude(initialData.longitude != null ? String(initialData.longitude) : '')
-      setAmenities(
-        Array.isArray(initialData.amenities)
-          ? initialData.amenities.map((a: any) =>
-              typeof a === 'string'
-                ? { name: a, image_url: '' }
-                : { name: a.name ?? '', image_url: a.image_url ?? '' }
-            )
-          : [],
-      )
-      setGallery(
-        Array.isArray(initialData.gallery)
-          ? initialData.gallery.filter((url: any) => typeof url === 'string')
-          : [],
-      )
+      setAmenities(normalizeAmenities(initialData.amenities))
+      setGallery(normalizeGallery(initialData.gallery))
       setCapacity(initialData.capacity != null ? String(initialData.capacity) : '')
       setIsActive(initialData.is_active ?? true)
     } else {
@@ -161,8 +145,8 @@ export function LocationFormModal({
     try {
       await onSubmit(formData)
       onClose()
-    } catch (err: any) {
-      setError(err?.message ?? 'Something went wrong. Please try again.')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
     } finally {
       setSubmitting(false)
     }
@@ -170,13 +154,14 @@ export function LocationFormModal({
 
   if (!isOpen) return null
 
-  const inputClass =
-    'w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-800 transition-colors focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:bg-stone-100 disabled:opacity-60'
-
-  const labelClass = 'mb-1 block text-sm font-medium text-stone-700'
-
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 pt-16 sm:items-center sm:pt-4">
+    <div
+      ref={trapRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="location-form-title"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 pt-16 sm:items-center sm:pt-4"
+    >
       <div
         className="absolute inset-0 bg-black/50"
         onClick={submitting ? undefined : onClose}
@@ -184,7 +169,7 @@ export function LocationFormModal({
 
       <div className="relative w-full max-w-2xl rounded-xl bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-stone-200 px-6 py-4">
-          <h2 className="text-lg font-semibold text-stone-900">
+          <h2 id="location-form-title" className="text-lg font-semibold text-stone-900">
             {isEditMode ? 'Edit Location' : 'Add Location'}
           </h2>
           <button
@@ -193,9 +178,7 @@ export function LocationFormModal({
             disabled={submitting}
             className="rounded-lg p-1.5 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-600 disabled:opacity-50"
           >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-            </svg>
+            <CloseIcon />
           </button>
         </div>
 
@@ -210,7 +193,7 @@ export function LocationFormModal({
             {/* Name & Slug */}
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label htmlFor="loc-name" className={labelClass}>
+                <label htmlFor="loc-name" className={labelClassName}>
                   Name <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -219,12 +202,12 @@ export function LocationFormModal({
                   value={name}
                   onChange={(e) => handleNameChange(e.target.value)}
                   disabled={submitting}
-                  className={inputClass}
+                  className={inputClassName}
                   placeholder="Pine Valley Camp"
                 />
               </div>
               <div>
-                <label htmlFor="loc-slug" className={labelClass}>
+                <label htmlFor="loc-slug" className={labelClassName}>
                   Slug
                 </label>
                 <input
@@ -233,7 +216,7 @@ export function LocationFormModal({
                   value={slug}
                   onChange={(e) => setSlug(e.target.value)}
                   disabled={submitting}
-                  className={inputClass}
+                  className={inputClassName}
                   placeholder="pine-valley-camp"
                 />
               </div>
@@ -241,7 +224,7 @@ export function LocationFormModal({
 
             {/* Description */}
             <div>
-              <label htmlFor="loc-desc" className={labelClass}>
+              <label htmlFor="loc-desc" className={labelClassName}>
                 Description
               </label>
               <textarea
@@ -250,14 +233,14 @@ export function LocationFormModal({
                 onChange={(e) => setDescription(e.target.value)}
                 disabled={submitting}
                 rows={3}
-                className={inputClass + ' resize-y'}
+                className={inputClassName + ' resize-y'}
                 placeholder="A serene camping spot nestled among tall pines..."
               />
             </div>
 
             {/* Image URL */}
             <div>
-              <label htmlFor="loc-img" className={labelClass}>
+              <label htmlFor="loc-img" className={labelClassName}>
                 Image URL
               </label>
               <input
@@ -266,14 +249,14 @@ export function LocationFormModal({
                 value={imageUrl}
                 onChange={(e) => setImageUrl(e.target.value)}
                 disabled={submitting}
-                className={inputClass}
+                className={inputClassName}
                 placeholder="https://example.com/image.jpg"
               />
             </div>
 
             {/* Region */}
             <div>
-              <label htmlFor="loc-region" className={labelClass}>
+              <label htmlFor="loc-region" className={labelClassName}>
                 Region
               </label>
               <input
@@ -282,7 +265,7 @@ export function LocationFormModal({
                 value={region}
                 onChange={(e) => setRegion(e.target.value)}
                 disabled={submitting}
-                className={inputClass}
+                className={inputClassName}
                 placeholder="Tanay, Rizal"
               />
             </div>
@@ -290,7 +273,7 @@ export function LocationFormModal({
             {/* Lat & Long */}
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label htmlFor="loc-lat" className={labelClass}>
+                <label htmlFor="loc-lat" className={labelClassName}>
                   Latitude
                 </label>
                 <input
@@ -300,12 +283,12 @@ export function LocationFormModal({
                   value={latitude}
                   onChange={(e) => setLatitude(e.target.value)}
                   disabled={submitting}
-                  className={inputClass}
+                  className={inputClassName}
                   placeholder="14.5340"
                 />
               </div>
               <div>
-                <label htmlFor="loc-lng" className={labelClass}>
+                <label htmlFor="loc-lng" className={labelClassName}>
                   Longitude
                 </label>
                 <input
@@ -315,7 +298,7 @@ export function LocationFormModal({
                   value={longitude}
                   onChange={(e) => setLongitude(e.target.value)}
                   disabled={submitting}
-                  className={inputClass}
+                  className={inputClassName}
                   placeholder="121.4150"
                 />
               </div>
@@ -324,7 +307,7 @@ export function LocationFormModal({
             {/* Amenities */}
             <div>
               <div className="mb-2 flex items-center justify-between">
-                <label className={labelClass + ' mb-0'}>Amenities</label>
+                <label className={labelClassName + ' mb-0'}>Amenities</label>
                 <button
                   type="button"
                   onClick={addAmenity}
@@ -370,7 +353,7 @@ export function LocationFormModal({
                             value={amenity.name}
                             onChange={(e) => updateAmenity(index, 'name', e.target.value)}
                             disabled={submitting}
-                            className={inputClass}
+                            className={inputClassName}
                             placeholder="e.g. Fire Pits, Restrooms, Hiking Trails"
                           />
                           <input
@@ -378,7 +361,7 @@ export function LocationFormModal({
                             value={amenity.image_url}
                             onChange={(e) => updateAmenity(index, 'image_url', e.target.value)}
                             disabled={submitting}
-                            className={inputClass}
+                            className={inputClassName}
                             placeholder="Image URL (optional)"
                           />
                         </div>
@@ -389,9 +372,7 @@ export function LocationFormModal({
                           className="shrink-0 rounded-md p-1.5 text-stone-400 transition-colors hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
                           title="Remove amenity"
                         >
-                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                          </svg>
+                          <CloseIcon className="h-4 w-4" />
                         </button>
                       </div>
                     </div>
@@ -403,7 +384,7 @@ export function LocationFormModal({
             {/* Gallery */}
             <div>
               <div className="mb-2 flex items-center justify-between">
-                <label className={labelClass + ' mb-0'}>Gallery Photos</label>
+                <label className={labelClassName + ' mb-0'}>Gallery Photos</label>
                 <button
                   type="button"
                   onClick={addGalleryImage}
@@ -446,7 +427,7 @@ export function LocationFormModal({
                         value={url}
                         onChange={(e) => updateGalleryImage(index, e.target.value)}
                         disabled={submitting}
-                        className={inputClass + ' flex-1'}
+                        className={inputClassName + ' flex-1'}
                         placeholder="https://example.com/photo.jpg"
                       />
                       <button
@@ -456,9 +437,7 @@ export function LocationFormModal({
                         className="shrink-0 rounded-md p-1.5 text-stone-400 transition-colors hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
                         title="Remove photo"
                       >
-                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                        </svg>
+                        <CloseIcon className="h-4 w-4" />
                       </button>
                     </div>
                   ))}
@@ -469,7 +448,7 @@ export function LocationFormModal({
             {/* Capacity & Active */}
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label htmlFor="loc-cap" className={labelClass}>
+                <label htmlFor="loc-cap" className={labelClassName}>
                   Capacity
                 </label>
                 <input
@@ -479,7 +458,7 @@ export function LocationFormModal({
                   value={capacity}
                   onChange={(e) => setCapacity(e.target.value)}
                   disabled={submitting}
-                  className={inputClass}
+                  className={inputClassName}
                   placeholder="50"
                 />
               </div>
