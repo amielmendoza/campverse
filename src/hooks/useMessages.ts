@@ -135,13 +135,40 @@ export function useMessages(locationId: string | undefined) {
       if (!user) throw new Error('Must be signed in to send a message')
       if (!locationId) throw new Error('No location specified')
 
-      const { error } = await supabase.from('messages').insert({
-        location_id: locationId,
-        user_id: user.id,
-        content,
-      })
+      const { data, error } = await supabase
+        .from('messages')
+        .insert({
+          location_id: locationId,
+          user_id: user.id,
+          content,
+        })
+        .select('*')
+        .single()
 
       if (error) throw error
+
+      // Optimistic: add the message immediately without waiting for Realtime
+      if (data) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('username, display_name, avatar_url')
+          .eq('id', user.id)
+          .single()
+
+        const messageWithProfile: MessageWithProfile = {
+          ...data,
+          profile: {
+            username: profileData?.username ?? '',
+            display_name: profileData?.display_name ?? null,
+            avatar_url: profileData?.avatar_url ?? null,
+          },
+        }
+
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === data.id)) return prev
+          return [...prev, messageWithProfile]
+        })
+      }
     },
     [user, locationId],
   )
