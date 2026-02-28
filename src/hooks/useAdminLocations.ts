@@ -14,6 +14,7 @@ export interface LocationFormData {
   amenities: AmenityItem[]
   gallery: string[]
   capacity: number | null
+  rules: string
   is_active: boolean
 }
 
@@ -62,6 +63,7 @@ export function useAdminLocations() {
         amenities: data.amenities,
         gallery: data.gallery,
         capacity: data.capacity,
+        rules: data.rules || null,
         is_active: data.is_active,
       })
 
@@ -86,6 +88,7 @@ export function useAdminLocations() {
       if (data.longitude !== undefined) updateData.longitude = data.longitude
       if (data.region !== undefined) updateData.region = data.region
       if (data.capacity !== undefined) updateData.capacity = data.capacity
+      if (data.rules !== undefined) updateData.rules = data.rules || null
       if (data.is_active !== undefined) updateData.is_active = data.is_active
       if (data.amenities !== undefined) {
         updateData.amenities = JSON.parse(JSON.stringify(data.amenities))

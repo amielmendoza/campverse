@@ -34,6 +34,7 @@ export function LocationFormModal({
   const [amenities, setAmenities] = useState<AmenityItem[]>([])
   const [gallery, setGallery] = useState<string[]>([])
   const [capacity, setCapacity] = useState('')
+  const [rules, setRules] = useState('')
   const [isActive, setIsActive] = useState(true)
 
   const [submitting, setSubmitting] = useState(false)
@@ -53,6 +54,7 @@ export function LocationFormModal({
       setAmenities(normalizeAmenities(initialData.amenities))
       setGallery(normalizeGallery(initialData.gallery))
       setCapacity(initialData.capacity != null ? String(initialData.capacity) : '')
+      setRules(initialData.rules ?? '')
       setIsActive(initialData.is_active ?? true)
     } else {
       setName('')
@@ -65,6 +67,7 @@ export function LocationFormModal({
       setAmenities([])
       setGallery([])
       setCapacity('')
+      setRules('')
       setIsActive(true)
     }
 
@@ -125,6 +128,7 @@ export function LocationFormModal({
       amenities: validAmenities.map((a) => ({ name: a.name.trim(), image_url: a.image_url.trim() })),
       gallery: gallery.map((url) => url.trim()).filter(Boolean),
       capacity: capacity.trim() ? parseInt(capacity, 10) : null,
+      rules: rules.trim(),
       is_active: isActive,
     }
 
@@ -235,6 +239,22 @@ export function LocationFormModal({
                 rows={3}
                 className={inputClassName + ' resize-y'}
                 placeholder="A serene camping spot nestled among tall pines..."
+              />
+            </div>
+
+            {/* Rules & Guidelines */}
+            <div>
+              <label htmlFor="loc-rules" className={labelClassName}>
+                Rules & Guidelines
+              </label>
+              <textarea
+                id="loc-rules"
+                value={rules}
+                onChange={(e) => setRules(e.target.value)}
+                disabled={submitting}
+                rows={4}
+                className={inputClassName + ' resize-y'}
+                placeholder={"No open fires outside designated fire pits\nQuiet hours: 10 PM – 6 AM\nPack in, pack out — leave no trace"}
               />
             </div>
 

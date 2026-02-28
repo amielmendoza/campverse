@@ -176,6 +176,18 @@ export function LocationDetail({
           </p>
         )}
 
+        {/* Rules & Guidelines */}
+        {location.rules && (
+          <div className="mb-4">
+            <h3 className="mb-2 text-sm font-semibold text-stone-700">
+              Rules & Guidelines
+            </h3>
+            <div className="rounded-lg bg-amber-50 p-4 text-sm leading-relaxed text-stone-700 whitespace-pre-wrap">
+              {location.rules}
+            </div>
+          </div>
+        )}
+
         {/* Amenities section */}
         <div>
           <h3 className="mb-2 text-sm font-semibold text-stone-700">

@@ -60,6 +60,7 @@ export interface Database {
           amenities: AmenityItem[] | null
           gallery: string[] | null
           capacity: number | null
+          rules: string | null
           is_active: boolean
           created_at: string
           updated_at: string
@@ -76,6 +77,7 @@ export interface Database {
           amenities?: AmenityItem[] | null
           gallery?: string[] | null
           capacity?: number | null
+          rules?: string | null
           is_active?: boolean
           created_at?: string
           updated_at?: string
@@ -92,6 +94,7 @@ export interface Database {
           amenities?: AmenityItem[] | null
           gallery?: string[] | null
           capacity?: number | null
+          rules?: string | null
           is_active?: boolean
           created_at?: string
           updated_at?: string
