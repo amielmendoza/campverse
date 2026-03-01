@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 import { generateSlug } from '../lib/utils/slug'
 import type { Location, AmenityItem } from '../lib/types'
 
@@ -15,10 +16,12 @@ export interface LocationFormData {
   gallery: string[]
   capacity: number | null
   rules: string
+  owner_id: string | null
   is_active: boolean
 }
 
 export function useAdminLocations() {
+  const { user } = useAuth()
   const [locations, setLocations] = useState<Location[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -50,35 +53,54 @@ export function useAdminLocations() {
 
   const createLocation = useCallback(
     async (data: LocationFormData) => {
+      if (!user) return
       const slug = data.slug || generateSlug(data.name)
 
-      const { error: insertError } = await supabase.from('locations').insert({
-        name: data.name,
-        slug,
-        description: data.description,
-        image_url: data.image_url,
-        latitude: data.latitude,
-        longitude: data.longitude,
-        region: data.region,
-        amenities: data.amenities,
-        gallery: data.gallery,
-        capacity: data.capacity,
-        rules: data.rules || null,
-        is_active: data.is_active,
-      })
+      const { data: created, error: insertError } = await supabase
+        .from('locations')
+        .insert({
+          name: data.name,
+          slug,
+          description: data.description,
+          image_url: data.image_url,
+          latitude: data.latitude,
+          longitude: data.longitude,
+          region: data.region,
+          amenities: data.amenities,
+          gallery: data.gallery,
+          capacity: data.capacity,
+          rules: data.rules || null,
+          owner_id: data.owner_id || null,
+          is_active: data.is_active,
+        })
+        .select('id')
+        .single()
 
       if (insertError) {
         console.error('Create location error:', insertError)
         throw new Error(insertError.message)
       }
 
+      await supabase.from('location_audit_log').insert({
+        location_id: created.id,
+        location_name: data.name,
+        action: 'created',
+        actor_id: user.id,
+        changes: { ...data, slug },
+      })
+
       await fetchLocations()
     },
-    [fetchLocations]
+    [user, fetchLocations],
   )
 
   const updateLocation = useCallback(
     async (id: string, data: Partial<LocationFormData>) => {
+      if (!user) return
+
+      // Get current state for audit before/after
+      const current = locations.find((l) => l.id === id)
+
       const updateData: Record<string, unknown> = {}
 
       if (data.name !== undefined) updateData.name = data.name
@@ -89,6 +111,7 @@ export function useAdminLocations() {
       if (data.region !== undefined) updateData.region = data.region
       if (data.capacity !== undefined) updateData.capacity = data.capacity
       if (data.rules !== undefined) updateData.rules = data.rules || null
+      if (data.owner_id !== undefined) updateData.owner_id = data.owner_id || null
       if (data.is_active !== undefined) updateData.is_active = data.is_active
       if (data.amenities !== undefined) {
         updateData.amenities = JSON.parse(JSON.stringify(data.amenities))
@@ -113,13 +136,43 @@ export function useAdminLocations() {
         throw new Error(updateError.message)
       }
 
+      // Build before/after for changed fields
+      const before: Record<string, unknown> = {}
+      const after: Record<string, unknown> = {}
+      for (const key of Object.keys(updateData)) {
+        if (current && JSON.stringify((current as Record<string, unknown>)[key]) !== JSON.stringify(updateData[key])) {
+          before[key] = (current as Record<string, unknown>)[key]
+          after[key] = updateData[key]
+        }
+      }
+
+      await supabase.from('location_audit_log').insert({
+        location_id: id,
+        location_name: current?.name ?? data.name ?? 'Unknown',
+        action: 'updated',
+        actor_id: user.id,
+        changes: { before, after },
+      })
+
       await fetchLocations()
     },
-    [fetchLocations]
+    [user, locations, fetchLocations],
   )
 
   const deleteLocation = useCallback(
     async (id: string) => {
+      if (!user) return
+
+      const current = locations.find((l) => l.id === id)
+
+      // Insert audit entry before delete (location_id will be SET NULL on cascade)
+      await supabase.from('location_audit_log').insert({
+        location_id: id,
+        location_name: current?.name ?? 'Unknown',
+        action: 'deleted',
+        actor_id: user.id,
+      })
+
       const { error: deleteError } = await supabase
         .from('locations')
         .delete()
@@ -132,7 +185,7 @@ export function useAdminLocations() {
 
       await fetchLocations()
     },
-    [fetchLocations]
+    [user, locations, fetchLocations],
   )
 
   return {

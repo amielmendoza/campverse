@@ -14,7 +14,7 @@ export function LoginPage() {
       <div className="mb-8 text-center">
         <h1 className="text-4xl font-bold text-emerald-700">Campverse</h1>
         <p className="mt-2 text-stone-500">
-          Find your tribe. Share the trail.
+          Every campsite, a new universe of connections.
         </p>
       </div>
       <LoginForm />

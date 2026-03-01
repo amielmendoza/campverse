@@ -1,8 +1,39 @@
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
+import { supabase } from '../../lib/supabase'
 
 export function Navbar() {
-  const { profile, isAdmin, signOut } = useAuth()
+  const { profile, isAdmin, ownedLocationIds, signOut } = useAuth()
+  const [pendingCount, setPendingCount] = useState(0)
+
+  const fetchPendingCount = useCallback(() => {
+    supabase
+      .from('location_change_requests')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pending')
+      .then(({ count }) => setPendingCount(count ?? 0))
+  }, [])
+
+  // Fetch pending approval count for admins + subscribe to changes
+  useEffect(() => {
+    if (!isAdmin) return
+
+    fetchPendingCount()
+
+    const channel = supabase
+      .channel('navbar-pending-count')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'location_change_requests' },
+        () => fetchPendingCount(),
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [isAdmin, fetchPendingCount])
   const navigate = useNavigate()
 
   const handleSignOut = async () => {
@@ -31,12 +62,25 @@ export function Navbar() {
             >
               Locations
             </Link>
+            {ownedLocationIds.length > 0 && !isAdmin && (
+              <Link
+                to="/my-locations"
+                className="rounded-md px-3 py-1.5 text-sm font-medium text-emerald-100 transition-colors hover:bg-emerald-600 hover:text-white"
+              >
+                My Locations
+              </Link>
+            )}
             {isAdmin && (
               <Link
                 to="/admin/locations"
-                className="rounded-md bg-amber-500/20 px-3 py-1.5 text-sm font-medium text-amber-200 transition-colors hover:bg-amber-500/30 hover:text-amber-100"
+                className="relative rounded-md bg-amber-500/20 px-3 py-1.5 text-sm font-medium text-amber-200 transition-colors hover:bg-amber-500/30 hover:text-amber-100"
               >
                 Admin
+                {pendingCount > 0 && (
+                  <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                    {pendingCount}
+                  </span>
+                )}
               </Link>
             )}
           </div>

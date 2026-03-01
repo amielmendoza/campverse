@@ -13,6 +13,7 @@ const LocationDetailPage = lazy(() => import('./pages/LocationDetailPage').then(
 const ProfilePage = lazy(() => import('./pages/ProfilePage').then(m => ({ default: m.ProfilePage })))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage').then(m => ({ default: m.NotFoundPage })))
 const AdminLocationsPage = lazy(() => import('./pages/AdminLocationsPage').then(m => ({ default: m.AdminLocationsPage })))
+const MyLocationsPage = lazy(() => import('./pages/MyLocationsPage').then(m => ({ default: m.MyLocationsPage })))
 
 function App() {
   return (
@@ -27,6 +28,7 @@ function App() {
                 <Route path="/locations" element={<LocationsPage />} />
                 <Route path="/locations/:slug" element={<LocationDetailPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/my-locations" element={<MyLocationsPage />} />
                 <Route element={<AdminGuard />}>
                   <Route path="/admin/locations" element={<AdminLocationsPage />} />
                 </Route>

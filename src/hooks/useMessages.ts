@@ -85,6 +85,17 @@ export function useMessages(locationId: string | undefined) {
     [fetchMessages],
   )
 
+  // Mark chat as read for the current user
+  const markAsRead = useCallback(() => {
+    if (!user || !locationId) return
+    supabase
+      .from('location_memberships')
+      .update({ last_read_at: new Date().toISOString() })
+      .eq('user_id', user.id)
+      .eq('location_id', locationId)
+      .then(() => {})
+  }, [user, locationId])
+
   // Initial load
   useEffect(() => {
     if (!locationId) {
@@ -101,11 +112,12 @@ export function useMessages(locationId: string | undefined) {
       if (cancelled) return
       if (result) setMessages(result)
       setLoading(false)
+      markAsRead()
     }
 
     load()
     return () => { cancelled = true }
-  }, [locationId, fetchMessages])
+  }, [locationId, fetchMessages, markAsRead])
 
   // Realtime: when ANY change happens, just refetch all messages.
   useEffect(() => {
@@ -126,6 +138,7 @@ export function useMessages(locationId: string | undefined) {
         () => {
           realtimeWorking = true
           debouncedFetchAndSet()
+          markAsRead()
         },
       )
       .subscribe()
@@ -153,7 +166,7 @@ export function useMessages(locationId: string | undefined) {
         channelRef.current = null
       }
     }
-  }, [locationId, fetchMessages, debouncedFetchAndSet])
+  }, [locationId, fetchMessages, debouncedFetchAndSet, markAsRead])
 
   // Send: just insert. Realtime refetch will show it.
   const sendMessage = useCallback(

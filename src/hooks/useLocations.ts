@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 import type { Location } from '../lib/types'
 
 export interface LocationWithCount extends Location {
@@ -7,9 +8,12 @@ export interface LocationWithCount extends Location {
 }
 
 export function useLocations() {
+  const { user } = useAuth()
   const [locations, setLocations] = useState<LocationWithCount[]>([])
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
   const fetchLocations = useCallback(async () => {
     setLoading(true)
@@ -61,9 +65,71 @@ export function useLocations() {
     }
   }, [])
 
+  // Fetch unread message counts for the current user's memberships
+  const fetchUnreadCounts = useCallback(async () => {
+    if (!user) {
+      setUnreadCounts({})
+      return
+    }
+
+    // Get user's memberships with last_read_at
+    const { data: memberships } = await supabase
+      .from('location_memberships')
+      .select('location_id, last_read_at')
+      .eq('user_id', user.id)
+
+    if (!memberships || memberships.length === 0) {
+      setUnreadCounts({})
+      return
+    }
+
+    // For each membership, count messages newer than last_read_at from other users
+    const counts: Record<string, number> = {}
+    await Promise.all(
+      memberships.map(async (m) => {
+        const { count } = await supabase
+          .from('messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('location_id', m.location_id)
+          .gt('created_at', m.last_read_at)
+          .neq('user_id', user.id)
+
+        if (count && count > 0) {
+          counts[m.location_id] = count
+        }
+      }),
+    )
+
+    setUnreadCounts(counts)
+  }, [user])
+
   useEffect(() => {
     fetchLocations()
-  }, [fetchLocations])
+    fetchUnreadCounts()
+  }, [fetchLocations, fetchUnreadCounts])
 
-  return { locations, loading, error, refetch: fetchLocations }
+  // Subscribe to new messages to update unread counts in realtime
+  useEffect(() => {
+    if (!user) return
+
+    const channel = supabase
+      .channel('locations-unread')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages' },
+        () => fetchUnreadCounts(),
+      )
+      .subscribe()
+
+    channelRef.current = channel
+
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current)
+        channelRef.current = null
+      }
+    }
+  }, [user, fetchUnreadCounts])
+
+  return { locations, unreadCounts, loading, error, refetch: fetchLocations }
 }

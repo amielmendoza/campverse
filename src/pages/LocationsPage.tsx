@@ -4,7 +4,7 @@ import { LocationGrid } from '../components/locations/LocationGrid'
 import { LoadingSpinner } from '../components/ui/LoadingSpinner'
 
 export function LocationsPage() {
-  const { locations, loading, error } = useLocations()
+  const { locations, unreadCounts, loading, error } = useLocations()
   const [search, setSearch] = useState('')
 
   const filtered = useMemo(() => {
@@ -46,7 +46,7 @@ export function LocationsPage() {
         </div>
       )}
 
-      {!loading && !error && <LocationGrid locations={filtered} />}
+      {!loading && !error && <LocationGrid locations={filtered} unreadCounts={unreadCounts} />}
     </div>
   )
 }

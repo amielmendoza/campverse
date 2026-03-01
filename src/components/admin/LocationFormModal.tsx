@@ -2,11 +2,19 @@ import { useEffect, useState, type FormEvent } from 'react'
 import type { Location } from '../../lib/types'
 import type { AmenityItem } from '../../lib/types'
 import type { LocationFormData } from '../../hooks/useAdminLocations'
+import { useAuth } from '../../contexts/AuthContext'
+import { supabase } from '../../lib/supabase'
 import { generateSlug } from '../../lib/utils/slug'
 import { normalizeAmenities, normalizeGallery } from '../../lib/utils/amenities'
 import { inputClassName, labelClassName } from '../../lib/utils/styles'
 import { useFocusTrap } from '../../lib/utils/useFocusTrap'
 import { CloseIcon } from '../ui/CloseIcon'
+
+interface ProfileOption {
+  id: string
+  username: string
+  display_name: string | null
+}
 
 interface LocationFormModalProps {
   isOpen: boolean
@@ -23,6 +31,7 @@ export function LocationFormModal({
 }: LocationFormModalProps) {
   const isEditMode = !!initialData
   const trapRef = useFocusTrap(isOpen)
+  const { isAdmin } = useAuth()
 
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
@@ -35,10 +44,12 @@ export function LocationFormModal({
   const [gallery, setGallery] = useState<string[]>([])
   const [capacity, setCapacity] = useState('')
   const [rules, setRules] = useState('')
+  const [ownerId, setOwnerId] = useState<string>('')
   const [isActive, setIsActive] = useState(true)
 
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [profileOptions, setProfileOptions] = useState<ProfileOption[]>([])
 
   useEffect(() => {
     if (!isOpen) return
@@ -55,6 +66,7 @@ export function LocationFormModal({
       setGallery(normalizeGallery(initialData.gallery))
       setCapacity(initialData.capacity != null ? String(initialData.capacity) : '')
       setRules(initialData.rules ?? '')
+      setOwnerId(initialData.owner_id ?? '')
       setIsActive(initialData.is_active ?? true)
     } else {
       setName('')
@@ -68,12 +80,24 @@ export function LocationFormModal({
       setGallery([])
       setCapacity('')
       setRules('')
+      setOwnerId('')
       setIsActive(true)
     }
 
     setError(null)
     setSubmitting(false)
-  }, [isOpen, initialData])
+
+    // Fetch profiles for owner dropdown (admin only)
+    if (isAdmin) {
+      supabase
+        .from('profiles')
+        .select('id, username, display_name')
+        .order('username')
+        .then(({ data }) => {
+          setProfileOptions(data ?? [])
+        })
+    }
+  }, [isOpen, initialData, isAdmin])
 
   function handleNameChange(value: string) {
     setName(value)
@@ -114,6 +138,22 @@ export function LocationFormModal({
       setError('Name is required.')
       return
     }
+    if (name.trim().length > 255) {
+      setError('Name must be 255 characters or less.')
+      return
+    }
+    if (description.trim().length > 5000) {
+      setError('Description must be 5,000 characters or less.')
+      return
+    }
+    if (rules.trim().length > 5000) {
+      setError('Rules must be 5,000 characters or less.')
+      return
+    }
+    if (region.trim().length > 255) {
+      setError('Region must be 255 characters or less.')
+      return
+    }
 
     const validAmenities = amenities.filter((a) => a.name.trim())
 
@@ -129,6 +169,7 @@ export function LocationFormModal({
       gallery: gallery.map((url) => url.trim()).filter(Boolean),
       capacity: capacity.trim() ? parseInt(capacity, 10) : null,
       rules: rules.trim(),
+      owner_id: ownerId || null,
       is_active: isActive,
     }
 
@@ -136,12 +177,24 @@ export function LocationFormModal({
       setError('Latitude must be a valid number.')
       return
     }
+    if (formData.latitude != null && (formData.latitude < -90 || formData.latitude > 90)) {
+      setError('Latitude must be between -90 and 90.')
+      return
+    }
     if (formData.longitude != null && isNaN(formData.longitude)) {
       setError('Longitude must be a valid number.')
       return
     }
+    if (formData.longitude != null && (formData.longitude < -180 || formData.longitude > 180)) {
+      setError('Longitude must be between -180 and 180.')
+      return
+    }
     if (formData.capacity != null && isNaN(formData.capacity)) {
       setError('Capacity must be a valid number.')
+      return
+    }
+    if (formData.capacity != null && formData.capacity < 0) {
+      setError('Capacity cannot be negative.')
       return
     }
 
@@ -206,6 +259,7 @@ export function LocationFormModal({
                   value={name}
                   onChange={(e) => handleNameChange(e.target.value)}
                   disabled={submitting}
+                  maxLength={255}
                   className={inputClassName}
                   placeholder="Pine Valley Camp"
                 />
@@ -237,6 +291,7 @@ export function LocationFormModal({
                 onChange={(e) => setDescription(e.target.value)}
                 disabled={submitting}
                 rows={3}
+                maxLength={5000}
                 className={inputClassName + ' resize-y'}
                 placeholder="A serene camping spot nestled among tall pines..."
               />
@@ -253,6 +308,7 @@ export function LocationFormModal({
                 onChange={(e) => setRules(e.target.value)}
                 disabled={submitting}
                 rows={4}
+                maxLength={5000}
                 className={inputClassName + ' resize-y'}
                 placeholder={"No open fires outside designated fire pits\nQuiet hours: 10 PM – 6 AM\nPack in, pack out — leave no trace"}
               />
@@ -285,6 +341,7 @@ export function LocationFormModal({
                 value={region}
                 onChange={(e) => setRegion(e.target.value)}
                 disabled={submitting}
+                maxLength={255}
                 className={inputClassName}
                 placeholder="Tanay, Rizal"
               />
@@ -499,6 +556,29 @@ export function LocationFormModal({
                 </label>
               </div>
             </div>
+
+            {/* Owner (admin only) */}
+            {isAdmin && (
+              <div>
+                <label htmlFor="loc-owner" className={labelClassName}>
+                  Owner
+                </label>
+                <select
+                  id="loc-owner"
+                  value={ownerId}
+                  onChange={(e) => setOwnerId(e.target.value)}
+                  disabled={submitting}
+                  className={inputClassName}
+                >
+                  <option value="">No owner</option>
+                  {profileOptions.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.display_name || p.username} (@{p.username})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           {/* Footer */}

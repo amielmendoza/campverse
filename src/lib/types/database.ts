@@ -61,6 +61,7 @@ export interface Database {
           gallery: string[] | null
           capacity: number | null
           rules: string | null
+          owner_id: string | null
           is_active: boolean
           created_at: string
           updated_at: string
@@ -78,6 +79,7 @@ export interface Database {
           gallery?: string[] | null
           capacity?: number | null
           rules?: string | null
+          owner_id?: string | null
           is_active?: boolean
           created_at?: string
           updated_at?: string
@@ -95,6 +97,7 @@ export interface Database {
           gallery?: string[] | null
           capacity?: number | null
           rules?: string | null
+          owner_id?: string | null
           is_active?: boolean
           created_at?: string
           updated_at?: string
@@ -107,18 +110,21 @@ export interface Database {
           user_id: string
           location_id: string
           joined_at: string
+          last_read_at: string
         }
         Insert: {
           id?: string
           user_id: string
           location_id: string
           joined_at?: string
+          last_read_at?: string
         }
         Update: {
           id?: string
           user_id?: string
           location_id?: string
           joined_at?: string
+          last_read_at?: string
         }
         Relationships: [
           {
@@ -170,6 +176,105 @@ export interface Database {
           {
             foreignKeyName: 'messages_user_id_fkey'
             columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      location_change_requests: {
+        Row: {
+          id: string
+          location_id: string
+          submitted_by: string
+          changes: Record<string, unknown>
+          status: 'pending' | 'approved' | 'rejected'
+          admin_note: string | null
+          reviewed_by: string | null
+          created_at: string
+          reviewed_at: string | null
+        }
+        Insert: {
+          id?: string
+          location_id: string
+          submitted_by: string
+          changes: Record<string, unknown>
+          status?: string
+          admin_note?: string | null
+          reviewed_by?: string | null
+          created_at?: string
+          reviewed_at?: string | null
+        }
+        Update: {
+          id?: string
+          location_id?: string
+          submitted_by?: string
+          changes?: Record<string, unknown>
+          status?: string
+          admin_note?: string | null
+          reviewed_by?: string | null
+          created_at?: string
+          reviewed_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'location_change_requests_location_id_fkey'
+            columns: ['location_id']
+            isOneToOne: false
+            referencedRelation: 'locations'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'location_change_requests_submitted_by_fkey'
+            columns: ['submitted_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      location_audit_log: {
+        Row: {
+          id: string
+          location_id: string | null
+          location_name: string
+          action: 'created' | 'updated' | 'deleted' | 'change_approved' | 'change_rejected'
+          actor_id: string
+          changes: Record<string, unknown> | null
+          change_request_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          location_id?: string | null
+          location_name: string
+          action: string
+          actor_id: string
+          changes?: Record<string, unknown> | null
+          change_request_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          location_id?: string | null
+          location_name?: string
+          action?: string
+          actor_id?: string
+          changes?: Record<string, unknown> | null
+          change_request_id?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'location_audit_log_location_id_fkey'
+            columns: ['location_id']
+            isOneToOne: false
+            referencedRelation: 'locations'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'location_audit_log_actor_id_fkey'
+            columns: ['actor_id']
             isOneToOne: false
             referencedRelation: 'profiles'
             referencedColumns: ['id']

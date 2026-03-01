@@ -3,9 +3,10 @@ import { LocationCard } from './LocationCard'
 
 interface LocationGridProps {
   locations: LocationWithCount[]
+  unreadCounts?: Record<string, number>
 }
 
-export function LocationGrid({ locations }: LocationGridProps) {
+export function LocationGrid({ locations, unreadCounts }: LocationGridProps) {
   if (locations.length === 0) {
     return (
       <div className="py-12 text-center">
@@ -17,7 +18,7 @@ export function LocationGrid({ locations }: LocationGridProps) {
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
       {locations.map((location) => (
-        <LocationCard key={location.id} location={location} />
+        <LocationCard key={location.id} location={location} unreadCount={unreadCounts?.[location.id]} />
       ))}
     </div>
   )

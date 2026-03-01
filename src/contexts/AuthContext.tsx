@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { User, Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import type { Profile } from '../lib/types'
@@ -9,6 +9,8 @@ interface AuthContextType {
   profile: Profile | null
   loading: boolean
   isAdmin: boolean
+  ownedLocationIds: string[]
+  isOwner: (locationId: string) => boolean
   error: string | null
   signIn: (email: string, password: string) => Promise<void>
   signUp: (email: string, password: string, username: string, displayName: string) => Promise<void>
@@ -38,6 +40,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [ownedLocationIds, setOwnedLocationIds] = useState<string[]>([])
+
+  const isOwner = useCallback(
+    (locationId: string) => ownedLocationIds.includes(locationId),
+    [ownedLocationIds],
+  )
 
   useEffect(() => {
     let mounted = true
@@ -59,6 +67,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setProfile(p)
             setError(null)
           }
+          // Fetch owned location IDs
+          const { data: ownedData } = await supabase
+            .from('locations')
+            .select('id')
+            .eq('owner_id', newSession.user.id)
+          if (mounted) {
+            setOwnedLocationIds(ownedData?.map((l) => l.id) ?? [])
+          }
         } catch (err: unknown) {
           if (mounted) {
             setProfile(null)
@@ -67,6 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } else {
         setProfile(null)
+        setOwnedLocationIds([])
         setError(null)
       }
 
@@ -110,7 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, session, profile, loading, isAdmin: profile?.is_admin ?? false, error, signIn, signUp, signOut }}
+      value={{ user, session, profile, loading, isAdmin: profile?.is_admin ?? false, ownedLocationIds, isOwner, error, signIn, signUp, signOut }}
     >
       {children}
     </AuthContext.Provider>

@@ -4,9 +4,10 @@ import { normalizeAmenities } from '../../lib/utils/amenities'
 
 interface LocationCardProps {
   location: LocationWithCount
+  unreadCount?: number
 }
 
-export function LocationCard({ location }: LocationCardProps) {
+export function LocationCard({ location, unreadCount }: LocationCardProps) {
   const amenities = normalizeAmenities(location.amenities)
 
   return (
@@ -14,7 +15,7 @@ export function LocationCard({ location }: LocationCardProps) {
       to={`/locations/${location.slug}`}
       className="group block overflow-hidden rounded-xl bg-white shadow-sm transition-shadow hover:shadow-lg"
     >
-      <div className="aspect-video w-full overflow-hidden">
+      <div className="relative aspect-video w-full overflow-hidden">
         {location.image_url ? (
           <img
             src={location.image_url}
@@ -28,6 +29,11 @@ export function LocationCard({ location }: LocationCardProps) {
               {location.name.charAt(0)}
             </span>
           </div>
+        )}
+        {!!unreadCount && unreadCount > 0 && (
+          <span className="absolute right-2 top-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white shadow-md">
+            {unreadCount > 99 ? '99+' : unreadCount}
+          </span>
         )}
       </div>
       <div className="p-4">
@@ -52,18 +58,12 @@ export function LocationCard({ location }: LocationCardProps) {
               {location.memberCount} {location.memberCount === 1 ? 'member' : 'members'}
             </span>
             {location.latitude != null && location.longitude != null && (
-              <a
-                href={`https://www.google.com/maps/search/?api=1&query=${location.latitude},${location.longitude}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-100"
-              >
+              <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-600">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3 w-3">
                   <path fillRule="evenodd" d="M9.69 18.933l.003.001C9.89 19.02 10 19 10 19s.11.02.308-.066l.002-.001.006-.003.018-.008a5.741 5.741 0 00.281-.14c.186-.096.446-.24.757-.433.62-.384 1.445-.966 2.274-1.765C15.302 14.988 17 12.493 17 9A7 7 0 103 9c0 3.492 1.698 5.988 3.355 7.584a13.731 13.731 0 002.274 1.765 11.928 11.928 0 00.757.433c.113.058.2.098.281.14l.018.008.006.003zM10 11.25a2.25 2.25 0 100-4.5 2.25 2.25 0 000 4.5z" clipRule="evenodd" />
                 </svg>
                 Map
-              </a>
+              </span>
             )}
           </div>
           {amenities.length > 0 && (
