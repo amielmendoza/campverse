@@ -55,6 +55,7 @@ export function useMessages(locationId: string | undefined) {
   const fetchMessages = useCallback(async (): Promise<MessageWithProfile[] | null> => {
     if (!locationId) return null
 
+    // Fetch the LATEST N messages (descending) then reverse for chronological display
     const { data, error } = await supabase
       .from('messages')
       .select(`
@@ -66,11 +67,11 @@ export function useMessages(locationId: string | undefined) {
         )
       `)
       .eq('location_id', locationId)
-      .order('created_at', { ascending: true })
+      .order('created_at', { ascending: false })
       .limit(MESSAGES_PER_PAGE)
 
     if (error || !data) return null
-    return mapRows(data as MessageRow[])
+    return mapRows((data as MessageRow[]).reverse())
   }, [locationId])
 
   // Stable refs for values used inside effects (prevents channel churn)
