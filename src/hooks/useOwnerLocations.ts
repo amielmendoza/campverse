@@ -100,6 +100,10 @@ export function useOwnerLocations() {
         changes.amenities = data.amenities
       if (data.gallery !== undefined && changed(data.gallery, currentLocation.gallery))
         changes.gallery = data.gallery
+      if (data.price_per_night !== undefined && changed(data.price_per_night, currentLocation.price_per_night))
+        changes.price_per_night = data.price_per_night
+      if (data.payment_qr_url !== undefined && changed(data.payment_qr_url, currentLocation.payment_qr_url))
+        changes.payment_qr_url = data.payment_qr_url
 
       if (Object.keys(changes).length === 0) {
         throw new Error('No changes detected.')

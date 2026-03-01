@@ -9,6 +9,7 @@ interface LocationDetailProps {
   isMember: boolean
   onJoin: () => void
   onLeave: () => void
+  onBook?: () => void
   loading: boolean
 }
 
@@ -82,6 +83,7 @@ export function LocationDetail({
   isMember,
   onJoin,
   onLeave,
+  onBook,
   loading,
 }: LocationDetailProps) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
@@ -410,6 +412,15 @@ export function LocationDetail({
 
             <hr className="mb-4 border-stone-200" />
 
+            {location.price_per_night != null && (
+              <div className="mb-4 flex items-baseline gap-1">
+                <span className="text-2xl font-bold text-stone-900">
+                  PHP {location.price_per_night.toLocaleString()}
+                </span>
+                <span className="text-sm text-stone-500">/ night</span>
+              </div>
+            )}
+
             <div className="mb-4 space-y-3 text-sm text-stone-600">
               <div className="flex items-center justify-between">
                 <span>Members</span>
@@ -429,13 +440,25 @@ export function LocationDetail({
               )}
             </div>
 
+            {location.price_per_night != null && location.payment_qr_url && onBook && (
+              <button
+                onClick={onBook}
+                disabled={loading}
+                className="mb-3 w-full cursor-pointer rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-500 px-5 py-3 text-base font-semibold text-white transition-all hover:from-emerald-700 hover:to-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Book Now
+              </button>
+            )}
+
             <button
               onClick={isMember ? onLeave : onJoin}
               disabled={loading}
               className={`w-full cursor-pointer rounded-lg px-5 py-3 text-base font-semibold text-white transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
                 isMember
                   ? 'bg-rose-500 hover:bg-rose-600'
-                  : 'bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600'
+                  : location.price_per_night != null && location.payment_qr_url
+                    ? 'border border-stone-300 bg-white !text-stone-700 hover:bg-stone-50'
+                    : 'bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600'
               }`}
             >
               {loading ? 'Loading...' : isMember ? 'Leave this camp' : 'Join this camp'}

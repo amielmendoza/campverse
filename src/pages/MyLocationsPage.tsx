@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useOwnerLocations } from '../hooks/useOwnerLocations'
 import { LocationFormModal } from '../components/admin/LocationFormModal'
 import { LoadingSpinner } from '../components/ui/LoadingSpinner'
@@ -52,6 +53,15 @@ export function MyLocationsPage() {
         <p className="mt-1 text-stone-500">
           Manage locations you own. Changes require admin approval.
         </p>
+        <Link
+          to="/my-locations/bookings"
+          className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
+          </svg>
+          View Bookings
+        </Link>
       </div>
 
       {successMessage && (

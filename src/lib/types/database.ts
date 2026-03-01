@@ -62,6 +62,8 @@ export interface Database {
           capacity: number | null
           rules: string | null
           owner_id: string | null
+          price_per_night: number | null
+          payment_qr_url: string | null
           is_active: boolean
           created_at: string
           updated_at: string
@@ -80,6 +82,8 @@ export interface Database {
           capacity?: number | null
           rules?: string | null
           owner_id?: string | null
+          price_per_night?: number | null
+          payment_qr_url?: string | null
           is_active?: boolean
           created_at?: string
           updated_at?: string
@@ -98,6 +102,8 @@ export interface Database {
           capacity?: number | null
           rules?: string | null
           owner_id?: string | null
+          price_per_night?: number | null
+          payment_qr_url?: string | null
           is_active?: boolean
           created_at?: string
           updated_at?: string
@@ -227,6 +233,63 @@ export interface Database {
           {
             foreignKeyName: 'location_change_requests_submitted_by_fkey'
             columns: ['submitted_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      bookings: {
+        Row: {
+          id: string
+          location_id: string
+          user_id: string
+          check_in: string
+          check_out: string
+          guests: number
+          total_price: number
+          status: 'pending_payment' | 'pending_confirmation' | 'confirmed' | 'completed' | 'cancelled' | 'rejected'
+          owner_note: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          location_id: string
+          user_id: string
+          check_in: string
+          check_out: string
+          guests?: number
+          total_price: number
+          status?: string
+          owner_note?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          location_id?: string
+          user_id?: string
+          check_in?: string
+          check_out?: string
+          guests?: number
+          total_price?: number
+          status?: string
+          owner_note?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'bookings_location_id_fkey'
+            columns: ['location_id']
+            isOneToOne: false
+            referencedRelation: 'locations'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'bookings_user_id_fkey'
+            columns: ['user_id']
             isOneToOne: false
             referencedRelation: 'profiles'
             referencedColumns: ['id']

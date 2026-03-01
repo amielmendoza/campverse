@@ -17,6 +17,8 @@ export interface LocationFormData {
   capacity: number | null
   rules: string
   owner_id: string | null
+  price_per_night: number | null
+  payment_qr_url: string | null
   is_active: boolean
 }
 
@@ -71,6 +73,8 @@ export function useAdminLocations() {
           capacity: data.capacity,
           rules: data.rules || null,
           owner_id: data.owner_id || null,
+          price_per_night: data.price_per_night,
+          payment_qr_url: data.payment_qr_url || null,
           is_active: data.is_active,
         })
         .select('id')
@@ -112,6 +116,8 @@ export function useAdminLocations() {
       if (data.capacity !== undefined) updateData.capacity = data.capacity
       if (data.rules !== undefined) updateData.rules = data.rules || null
       if (data.owner_id !== undefined) updateData.owner_id = data.owner_id || null
+      if (data.price_per_night !== undefined) updateData.price_per_night = data.price_per_night
+      if (data.payment_qr_url !== undefined) updateData.payment_qr_url = data.payment_qr_url || null
       if (data.is_active !== undefined) updateData.is_active = data.is_active
       if (data.amenities !== undefined) {
         updateData.amenities = JSON.parse(JSON.stringify(data.amenities))

@@ -9,6 +9,8 @@ import { LocationDetail } from '../components/locations/LocationDetail'
 import { MemberList } from '../components/locations/MemberList'
 import { ChatRoom } from '../components/chat/ChatRoom'
 import { LoadingSpinner } from '../components/ui/LoadingSpinner'
+import { BookingFormModal } from '../components/bookings/BookingFormModal'
+import { useCreateBooking } from '../hooks/useCreateBooking'
 import type { Location } from '../lib/types'
 
 export function LocationDetailPage() {
@@ -72,6 +74,8 @@ export function LocationDetailPage() {
 
   const [actionLoading, setActionLoading] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [bookingOpen, setBookingOpen] = useState(false)
+  const { createBooking } = useCreateBooking()
 
   const handleJoin = async () => {
     if (!location) return
@@ -156,8 +160,20 @@ export function LocationDetailPage() {
         isMember={isMember}
         onJoin={handleJoin}
         onLeave={handleLeave}
+        onBook={location.price_per_night != null && location.payment_qr_url ? () => setBookingOpen(true) : undefined}
         loading={actionLoading}
       />
+
+      {location.price_per_night != null && location.payment_qr_url && (
+        <BookingFormModal
+          isOpen={bookingOpen}
+          onClose={() => setBookingOpen(false)}
+          onSubmit={async (checkIn, checkOut, guests, totalPrice) => {
+            await createBooking(location.id, checkIn, checkOut, guests, totalPrice)
+          }}
+          location={location}
+        />
+      )}
 
       {/* Community Section */}
       <hr className="my-8 border-stone-200" />

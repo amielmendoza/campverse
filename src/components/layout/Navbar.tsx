@@ -68,6 +68,12 @@ export function Navbar() {
             >
               Locations
             </Link>
+            <Link
+              to="/my-bookings"
+              className="rounded-md px-3 py-1.5 text-sm font-medium text-emerald-100 transition-colors hover:bg-emerald-600 hover:text-white"
+            >
+              My Bookings
+            </Link>
             {ownedLocationIds.length > 0 && !isAdmin && (
               <Link
                 to="/my-locations"

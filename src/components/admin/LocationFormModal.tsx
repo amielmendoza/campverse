@@ -9,6 +9,7 @@ import { normalizeAmenities, normalizeGallery } from '../../lib/utils/amenities'
 import { inputClassName, labelClassName } from '../../lib/utils/styles'
 import { useFocusTrap } from '../../lib/utils/useFocusTrap'
 import { CloseIcon } from '../ui/CloseIcon'
+import { PaymentQrUpload } from '../bookings/PaymentQrUpload'
 
 interface ProfileOption {
   id: string
@@ -45,6 +46,8 @@ export function LocationFormModal({
   const [capacity, setCapacity] = useState('')
   const [rules, setRules] = useState('')
   const [ownerId, setOwnerId] = useState<string>('')
+  const [pricePerNight, setPricePerNight] = useState('')
+  const [paymentQrUrl, setPaymentQrUrl] = useState('')
   const [isActive, setIsActive] = useState(true)
 
   const [submitting, setSubmitting] = useState(false)
@@ -67,6 +70,8 @@ export function LocationFormModal({
       setCapacity(initialData.capacity != null ? String(initialData.capacity) : '')
       setRules(initialData.rules ?? '')
       setOwnerId(initialData.owner_id ?? '')
+      setPricePerNight(initialData.price_per_night != null ? String(initialData.price_per_night) : '')
+      setPaymentQrUrl(initialData.payment_qr_url ?? '')
       setIsActive(initialData.is_active ?? true)
     } else {
       setName('')
@@ -81,6 +86,8 @@ export function LocationFormModal({
       setCapacity('')
       setRules('')
       setOwnerId('')
+      setPricePerNight('')
+      setPaymentQrUrl('')
       setIsActive(true)
     }
 
@@ -170,6 +177,8 @@ export function LocationFormModal({
       capacity: capacity.trim() ? parseInt(capacity, 10) : null,
       rules: rules.trim(),
       owner_id: ownerId || null,
+      price_per_night: pricePerNight.trim() ? parseFloat(pricePerNight) : null,
+      payment_qr_url: paymentQrUrl.trim() || null,
       is_active: isActive,
     }
 
@@ -195,6 +204,10 @@ export function LocationFormModal({
     }
     if (formData.capacity != null && formData.capacity < 0) {
       setError('Capacity cannot be negative.')
+      return
+    }
+    if (formData.price_per_night != null && (isNaN(formData.price_per_night) || formData.price_per_night <= 0)) {
+      setError('Price per night must be a positive number.')
       return
     }
 
@@ -554,6 +567,43 @@ export function LocationFormModal({
                   </div>
                   <span className="text-sm font-medium text-stone-700">Active</span>
                 </label>
+              </div>
+            </div>
+
+            {/* Booking Setup */}
+            <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
+              <h3 className="mb-3 text-sm font-semibold text-stone-800">Booking Setup</h3>
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="loc-price" className={labelClassName}>
+                    Price per Night
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-stone-400">PHP</span>
+                    <input
+                      id="loc-price"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={pricePerNight}
+                      onChange={(e) => setPricePerNight(e.target.value)}
+                      disabled={submitting}
+                      className={inputClassName + ' pl-12'}
+                      placeholder="500.00"
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-stone-400">Leave empty if this location is not bookable.</p>
+                </div>
+                <div>
+                  <label className={labelClassName}>Payment QR Code</label>
+                  <PaymentQrUpload
+                    locationId={initialData?.id}
+                    currentUrl={paymentQrUrl}
+                    onChange={setPaymentQrUrl}
+                    disabled={submitting}
+                  />
+                  <p className="mt-1 text-xs text-stone-400">Upload a GCash, PayMaya, or bank transfer QR code for camper payments.</p>
+                </div>
               </div>
             </div>
 
