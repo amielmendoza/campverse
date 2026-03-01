@@ -3,11 +3,13 @@ import type { Location } from '../../lib/types'
 import { inputClassName, labelClassName } from '../../lib/utils/styles'
 import { useFocusTrap } from '../../lib/utils/useFocusTrap'
 import { CloseIcon } from '../ui/CloseIcon'
+import { ReceiptUpload } from './ReceiptUpload'
 
 interface BookingFormModalProps {
   isOpen: boolean
   onClose: () => void
-  onSubmit: (checkIn: string, checkOut: string, guests: number, totalPrice: number) => Promise<void>
+  onSubmit: (checkIn: string, checkOut: string, guests: number, totalPrice: number) => Promise<string>
+  onMarkPaid: (bookingId: string, receiptUrl: string) => Promise<void>
   location: Location
 }
 
@@ -21,7 +23,9 @@ function getTodayStr(): string {
   return new Date().toISOString().split('T')[0]
 }
 
-export function BookingFormModal({ isOpen, onClose, onSubmit, location }: BookingFormModalProps) {
+type Step = 'form' | 'payment' | 'done'
+
+export function BookingFormModal({ isOpen, onClose, onSubmit, onMarkPaid, location }: BookingFormModalProps) {
   const trapRef = useFocusTrap(isOpen)
   const today = getTodayStr()
 
@@ -30,7 +34,9 @@ export function BookingFormModal({ isOpen, onClose, onSubmit, location }: Bookin
   const [guests, setGuests] = useState('1')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
+  const [step, setStep] = useState<Step>('form')
+  const [bookingId, setBookingId] = useState<string | null>(null)
+  const [receiptUrl, setReceiptUrl] = useState<string | null>(null)
 
   const pricePerNight = location.price_per_night ?? 0
   const nights = getNights(checkIn, checkOut)
@@ -64,8 +70,9 @@ export function BookingFormModal({ isOpen, onClose, onSubmit, location }: Bookin
 
     setSubmitting(true)
     try {
-      await onSubmit(checkIn, checkOut, guestCount, totalPrice)
-      setSuccess(true)
+      const id = await onSubmit(checkIn, checkOut, guestCount, totalPrice)
+      setBookingId(id)
+      setStep('payment')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create booking.')
     } finally {
@@ -73,12 +80,28 @@ export function BookingFormModal({ isOpen, onClose, onSubmit, location }: Bookin
     }
   }
 
+  async function handleSubmitPayment() {
+    if (!bookingId || !receiptUrl) return
+    setSubmitting(true)
+    setError(null)
+    try {
+      await onMarkPaid(bookingId, receiptUrl)
+      setStep('done')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to submit payment.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   function handleClose() {
-    setSuccess(false)
+    setStep('form')
     setError(null)
     setCheckIn(today)
     setCheckOut('')
     setGuests('1')
+    setBookingId(null)
+    setReceiptUrl(null)
     onClose()
   }
 
@@ -97,7 +120,9 @@ export function BookingFormModal({ isOpen, onClose, onSubmit, location }: Bookin
       <div className="relative w-full max-w-lg rounded-xl bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-stone-200 px-6 py-4">
           <h2 id="booking-form-title" className="text-lg font-semibold text-stone-900">
-            Book {location.name}
+            {step === 'form' && `Book ${location.name}`}
+            {step === 'payment' && 'Complete Payment'}
+            {step === 'done' && 'Booking Confirmed'}
           </h2>
           <button
             type="button"
@@ -109,26 +134,20 @@ export function BookingFormModal({ isOpen, onClose, onSubmit, location }: Bookin
           </button>
         </div>
 
-        {success ? (
+        {step === 'done' ? (
           <div className="px-6 py-8 text-center">
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
               <svg className="h-6 w-6 text-emerald-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
               </svg>
             </div>
-            <h3 className="mb-2 text-lg font-semibold text-stone-900">Booking Submitted!</h3>
-            <p className="mb-1 text-sm text-stone-600">
-              Please complete your payment using the QR code below, then mark your booking as paid from <strong>My Bookings</strong>.
+            <h3 className="mb-2 text-lg font-semibold text-stone-900">Payment Submitted!</h3>
+            <p className="text-sm text-stone-600">
+              Your booking and payment receipt have been submitted. The owner will review and confirm your booking shortly.
             </p>
-            {location.payment_qr_url && (
-              <div className="mt-4 inline-block overflow-hidden rounded-xl border border-stone-200 bg-white p-2">
-                <img
-                  src={location.payment_qr_url}
-                  alt="Payment QR Code"
-                  className="h-48 w-48 object-contain"
-                />
-              </div>
-            )}
+            <p className="mt-2 text-xs text-stone-400">
+              You can track your booking status from <strong>My Bookings</strong>.
+            </p>
             <div className="mt-6">
               <button
                 type="button"
@@ -136,6 +155,78 @@ export function BookingFormModal({ isOpen, onClose, onSubmit, location }: Bookin
                 className="rounded-lg bg-emerald-600 px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-700"
               >
                 Done
+              </button>
+            </div>
+          </div>
+        ) : step === 'payment' ? (
+          <div>
+            <div className="space-y-4 px-6 py-5">
+              {error && (
+                <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>
+              )}
+
+              {/* Summary */}
+              <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
+                <div className="flex items-center justify-between text-sm text-stone-600">
+                  <span>PHP {pricePerNight.toLocaleString()} x {nights} night{nights > 1 ? 's' : ''}</span>
+                  <span className="font-semibold text-stone-900">PHP {totalPrice.toLocaleString()}</span>
+                </div>
+              </div>
+
+              {/* QR Code */}
+              {location.payment_qr_url && (
+                <div className="text-center">
+                  <p className="mb-2 text-sm font-medium text-stone-700">Scan to pay</p>
+                  <div className="inline-block overflow-hidden rounded-xl border border-stone-200 bg-white p-2">
+                    <img
+                      src={location.payment_qr_url}
+                      alt="Payment QR Code"
+                      className="h-48 w-48 object-contain"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Receipt upload */}
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                <p className="mb-2 text-sm font-medium text-emerald-800">Upload your payment receipt</p>
+                <p className="mb-3 text-xs text-emerald-600">
+                  After paying, take a screenshot of your receipt and upload it below.
+                </p>
+                {bookingId && (
+                  <ReceiptUpload
+                    bookingId={bookingId}
+                    onUploaded={setReceiptUrl}
+                    disabled={submitting}
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end gap-3 border-t border-stone-200 px-6 py-4">
+              <button
+                type="button"
+                onClick={handleClose}
+                disabled={submitting}
+                className="rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-50 disabled:opacity-50"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmitPayment}
+                disabled={submitting || !receiptUrl}
+                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {submitting ? (
+                  <span className="flex items-center gap-2">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                    Submitting...
+                  </span>
+                ) : (
+                  'Submit Payment'
+                )}
               </button>
             </div>
           </div>
@@ -214,23 +305,6 @@ export function BookingFormModal({ isOpen, onClose, onSubmit, location }: Bookin
                   </div>
                 </div>
               )}
-
-              {/* QR Code Preview */}
-              {location.payment_qr_url && (
-                <div>
-                  <p className="mb-2 text-sm font-medium text-stone-700">Payment QR Code</p>
-                  <div className="inline-block overflow-hidden rounded-xl border border-stone-200 bg-white p-2">
-                    <img
-                      src={location.payment_qr_url}
-                      alt="Payment QR Code"
-                      className="h-40 w-40 object-contain"
-                    />
-                  </div>
-                  <p className="mt-1 text-xs text-stone-400">
-                    Scan this QR code to pay after submitting your booking.
-                  </p>
-                </div>
-              )}
             </div>
 
             {/* Footer */}
@@ -254,7 +328,7 @@ export function BookingFormModal({ isOpen, onClose, onSubmit, location }: Bookin
                     Booking...
                   </span>
                 ) : (
-                  `Book for PHP ${totalPrice.toLocaleString()}`
+                  'Proceed to Payment'
                 )}
               </button>
             </div>

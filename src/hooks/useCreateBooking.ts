@@ -22,7 +22,7 @@ export function useCreateBooking() {
       setError(null)
 
       try {
-        await guardedMutation(`book:${locationId}:${checkIn}`, async () => {
+        const bookingId = await guardedMutation(`book:${locationId}:${checkIn}`, async () => {
           const { data, error: insertError } = await supabase
             .from('bookings')
             .insert({
@@ -42,6 +42,8 @@ export function useCreateBooking() {
 
           return data.id
         })
+
+        return bookingId as string
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to create booking'
         setError(message)

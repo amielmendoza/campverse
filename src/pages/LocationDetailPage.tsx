@@ -11,6 +11,7 @@ import { ChatRoom } from '../components/chat/ChatRoom'
 import { LoadingSpinner } from '../components/ui/LoadingSpinner'
 import { BookingFormModal } from '../components/bookings/BookingFormModal'
 import { useCreateBooking } from '../hooks/useCreateBooking'
+import { useBookings } from '../hooks/useBookings'
 import type { Location } from '../lib/types'
 
 export function LocationDetailPage() {
@@ -76,6 +77,7 @@ export function LocationDetailPage() {
   const [actionError, setActionError] = useState<string | null>(null)
   const [bookingOpen, setBookingOpen] = useState(false)
   const { createBooking } = useCreateBooking()
+  const { markPaymentSubmitted } = useBookings()
 
   const handleJoin = async () => {
     if (!location) return
@@ -169,8 +171,9 @@ export function LocationDetailPage() {
           isOpen={bookingOpen}
           onClose={() => setBookingOpen(false)}
           onSubmit={async (checkIn, checkOut, guests, totalPrice) => {
-            await createBooking(location.id, checkIn, checkOut, guests, totalPrice)
+            return await createBooking(location.id, checkIn, checkOut, guests, totalPrice)
           }}
+          onMarkPaid={markPaymentSubmitted}
           location={location}
         />
       )}
