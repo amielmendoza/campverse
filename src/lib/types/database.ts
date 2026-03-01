@@ -250,6 +250,7 @@ export interface Database {
           total_price: number
           status: 'pending_payment' | 'pending_confirmation' | 'confirmed' | 'completed' | 'cancelled' | 'rejected'
           owner_note: string | null
+          receipt_url: string | null
           created_at: string
           updated_at: string
         }
@@ -263,6 +264,7 @@ export interface Database {
           total_price: number
           status?: string
           owner_note?: string | null
+          receipt_url?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -276,6 +278,7 @@ export interface Database {
           total_price?: number
           status?: string
           owner_note?: string | null
+          receipt_url?: string | null
           created_at?: string
           updated_at?: string
         }

@@ -358,6 +358,16 @@ export function MyLocationsPage() {
                               </td>
                               <td className="px-4 py-3">
                                 <div className="flex flex-wrap gap-1">
+                                  {booking.receipt_url && (
+                                    <a
+                                      href={booking.receipt_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="rounded bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                                    >
+                                      Receipt
+                                    </a>
+                                  )}
                                   {booking.status === 'pending_confirmation' && (
                                     <>
                                       <button

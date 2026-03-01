@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useBookings } from '../hooks/useBookings'
 import { BookingStatusBadge } from '../components/bookings/BookingStatusBadge'
+import { ReceiptUpload } from '../components/bookings/ReceiptUpload'
 import { LoadingSpinner } from '../components/ui/LoadingSpinner'
 import type { BookingStatus } from '../lib/types'
 
@@ -27,6 +28,8 @@ const canMarkPaid = (status: BookingStatus) =>
 export function MyBookingsPage() {
   const { bookings, loading, error, cancelBooking, markPaymentSubmitted } = useBookings()
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [uploadingForId, setUploadingForId] = useState<string | null>(null)
+  const [receiptUrls, setReceiptUrls] = useState<Record<string, string>>({})
 
   async function handleAction(id: string, action: () => Promise<void>) {
     setActionLoading(id)
@@ -118,26 +121,78 @@ export function MyBookingsPage() {
                       )}
                     </div>
 
+                    {/* Receipt preview for submitted bookings */}
+                    {booking.receipt_url && booking.status !== 'pending_payment' && (
+                      <div className="mt-2">
+                        <p className="mb-1 text-xs font-medium text-stone-500">Payment Receipt</p>
+                        <a href={booking.receipt_url} target="_blank" rel="noopener noreferrer">
+                          <img
+                            src={booking.receipt_url}
+                            alt="Payment receipt"
+                            className="h-20 rounded-md border border-stone-200 object-contain"
+                          />
+                        </a>
+                      </div>
+                    )}
+
                     {/* Actions */}
-                    <div className="mt-3 flex flex-wrap gap-2">
+                    <div className="mt-3">
                       {canMarkPaid(booking.status) && (
-                        <button
-                          onClick={() => handleAction(booking.id, () => markPaymentSubmitted(booking.id))}
-                          disabled={isLoading}
-                          className="rounded-lg bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
-                        >
-                          {isLoading ? 'Processing...' : "I've Paid"}
-                        </button>
+                        <div>
+                          {uploadingForId === booking.id ? (
+                            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                              <p className="mb-2 text-sm font-medium text-emerald-800">Upload your payment receipt</p>
+                              <ReceiptUpload
+                                bookingId={booking.id}
+                                onUploaded={(url) => setReceiptUrls((prev) => ({ ...prev, [booking.id]: url }))}
+                                disabled={isLoading}
+                              />
+                              <div className="mt-3 flex gap-2">
+                                <button
+                                  onClick={() => handleAction(booking.id, () => markPaymentSubmitted(booking.id, receiptUrls[booking.id]))}
+                                  disabled={isLoading || !receiptUrls[booking.id]}
+                                  className="rounded-lg bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
+                                >
+                                  {isLoading ? 'Submitting...' : 'Submit Payment'}
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setUploadingForId(null)
+                                    setReceiptUrls((prev) => {
+                                      const next = { ...prev }
+                                      delete next[booking.id]
+                                      return next
+                                    })
+                                  }}
+                                  disabled={isLoading}
+                                  className="rounded-lg border border-stone-300 bg-white px-4 py-1.5 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-50 disabled:opacity-50"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setUploadingForId(booking.id)}
+                              disabled={isLoading}
+                              className="rounded-lg bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
+                            >
+                              I've Paid
+                            </button>
+                          )}
+                        </div>
                       )}
-                      {canCancel(booking.status) && (
-                        <button
-                          onClick={() => handleAction(booking.id, () => cancelBooking(booking.id))}
-                          disabled={isLoading}
-                          className="rounded-lg border border-stone-300 bg-white px-4 py-1.5 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-50 disabled:opacity-50"
-                        >
-                          Cancel Booking
-                        </button>
-                      )}
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {canCancel(booking.status) && (
+                          <button
+                            onClick={() => handleAction(booking.id, () => cancelBooking(booking.id))}
+                            disabled={isLoading}
+                            className="rounded-lg border border-stone-300 bg-white px-4 py-1.5 text-sm font-medium text-stone-700 transition-colors hover:bg-stone-50 disabled:opacity-50"
+                          >
+                            Cancel Booking
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>

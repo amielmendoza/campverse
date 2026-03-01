@@ -15,6 +15,7 @@ export interface BookingWithLocation {
   total_price: number
   status: BookingStatus
   owner_note: string | null
+  receipt_url: string | null
   created_at: string
   updated_at: string
   location_name: string
@@ -32,6 +33,7 @@ interface BookingRow {
   total_price: number
   status: string
   owner_note: string | null
+  receipt_url: string | null
   created_at: string
   updated_at: string
   locations: {
@@ -82,6 +84,7 @@ export function useBookings() {
             total_price: row.total_price,
             status: row.status as BookingStatus,
             owner_note: row.owner_note,
+            receipt_url: row.receipt_url,
             created_at: row.created_at,
             updated_at: row.updated_at,
             location_name: row.locations?.name ?? 'Unknown',
@@ -149,11 +152,11 @@ export function useBookings() {
   )
 
   const markPaymentSubmitted = useCallback(
-    async (bookingId: string) => {
+    async (bookingId: string, receiptUrl: string) => {
       await guardedMutation(`markpaid:${bookingId}`, async () => {
         const { error: updateError } = await supabase
           .from('bookings')
-          .update({ status: 'pending_confirmation' })
+          .update({ status: 'pending_confirmation', receipt_url: receiptUrl })
           .eq('id', bookingId)
 
         if (updateError) throw updateError
