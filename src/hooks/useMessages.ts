@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { MESSAGES_PER_PAGE } from '../lib/constants'
-import { debounce } from '../lib/utils/debounce'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
 export interface MessageWithProfile {
@@ -47,7 +46,7 @@ function mapRows(data: MessageRow[]): MessageWithProfile[] {
 }
 
 export function useMessages(locationId: string | undefined) {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const [messages, setMessages] = useState<MessageWithProfile[]>([])
   const [loading, setLoading] = useState(true)
   const channelRef = useRef<RealtimeChannel | null>(null)
@@ -74,28 +73,18 @@ export function useMessages(locationId: string | undefined) {
     return mapRows(data as MessageRow[])
   }, [locationId])
 
-  // Debounced refetch for realtime callbacks (300ms)
-  const debouncedFetchAndSet = useMemo(
-    () =>
-      debounce(() => {
-        fetchMessages().then((result) => {
-          if (result) setMessages(result)
-        })
-      }, 300),
-    [fetchMessages],
-  )
-
-  // Mark chat as read for the current user (via ref to avoid dep churn)
-  const markAsReadRef = useRef(() => {})
-  markAsReadRef.current = () => {
+  // Mark chat as read — fire-and-forget with proper error handling
+  const markAsRead = useCallback(() => {
     if (!user || !locationId) return
     supabase
       .from('location_memberships')
       .update({ last_read_at: new Date().toISOString() })
       .eq('user_id', user.id)
       .eq('location_id', locationId)
-      .then(() => {})
-  }
+      .then(({ error }) => {
+        if (error) console.warn('Failed to mark as read:', error.message)
+      })
+  }, [user, locationId])
 
   // Initial load
   useEffect(() => {
@@ -113,18 +102,22 @@ export function useMessages(locationId: string | undefined) {
       if (cancelled) return
       if (result) setMessages(result)
       setLoading(false)
-      markAsReadRef.current()
+      markAsRead()
     }
 
     load()
     return () => { cancelled = true }
-  }, [locationId, fetchMessages])
+  }, [locationId, fetchMessages, markAsRead])
 
-  // Realtime: when ANY change happens, just refetch all messages.
+  // Realtime subscription + polling fallback
   useEffect(() => {
     if (!locationId) return
 
-    let realtimeWorking = false
+    const refetch = () => {
+      fetchMessages().then((result) => {
+        if (result) setMessages(result)
+      })
+    }
 
     const channel = supabase
       .channel(`messages:${locationId}`)
@@ -137,28 +130,18 @@ export function useMessages(locationId: string | undefined) {
           filter: `location_id=eq.${locationId}`,
         },
         () => {
-          realtimeWorking = true
-          debouncedFetchAndSet()
-          markAsReadRef.current()
+          refetch()
+          markAsRead()
         },
       )
       .subscribe()
 
     channelRef.current = channel
 
-    // Polling fallback — only if Realtime never fires
-    const poll = setInterval(async () => {
-      if (realtimeWorking) return
-      const result = await fetchMessages()
-      if (!result) return
-      setMessages((prev) => {
-        if (prev.length === result.length && prev.length > 0 &&
-            prev[prev.length - 1].id === result[result.length - 1].id) {
-          return prev
-        }
-        return result
-      })
-    }, 3000)
+    // Polling fallback — always active as a safety net
+    const poll = setInterval(() => {
+      refetch()
+    }, 5000)
 
     return () => {
       clearInterval(poll)
@@ -167,13 +150,28 @@ export function useMessages(locationId: string | undefined) {
         channelRef.current = null
       }
     }
-  }, [locationId, fetchMessages, debouncedFetchAndSet])
+  }, [locationId, fetchMessages, markAsRead])
 
-  // Send: just insert. Realtime refetch will show it.
+  // Send: optimistic update + refetch for confirmation
   const sendMessage = useCallback(
     async (content: string) => {
       if (!user) throw new Error('Must be signed in to send a message')
       if (!locationId) throw new Error('No location specified')
+
+      // Optimistic: add message to the list immediately
+      const optimisticMsg: MessageWithProfile = {
+        id: `optimistic-${Date.now()}`,
+        location_id: locationId,
+        user_id: user.id,
+        content,
+        created_at: new Date().toISOString(),
+        profile: {
+          username: profile?.username ?? '',
+          display_name: profile?.display_name ?? null,
+          avatar_url: profile?.avatar_url ?? null,
+        },
+      }
+      setMessages((prev) => [...prev, optimisticMsg])
 
       const { error } = await supabase
         .from('messages')
@@ -183,9 +181,19 @@ export function useMessages(locationId: string | undefined) {
           content,
         })
 
-      if (error) throw error
+      if (error) {
+        // Rollback optimistic update
+        setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id))
+        throw error
+      }
+
+      // Refetch to replace optimistic message with real data
+      const result = await fetchMessages()
+      if (result) setMessages(result)
+
+      markAsRead()
     },
-    [user, locationId],
+    [user, locationId, fetchMessages, profile, markAsRead],
   )
 
   return { messages, loading, sendMessage }
