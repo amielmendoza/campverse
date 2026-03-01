@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
@@ -6,18 +6,19 @@ import { supabase } from '../../lib/supabase'
 export function Navbar() {
   const { profile, isAdmin, ownedLocationIds, signOut } = useAuth()
   const [pendingCount, setPendingCount] = useState(0)
-
-  const fetchPendingCount = useCallback(() => {
-    supabase
-      .from('location_change_requests')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'pending')
-      .then(({ count }) => setPendingCount(count ?? 0))
-  }, [])
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
   // Fetch pending approval count for admins + subscribe to changes
   useEffect(() => {
     if (!isAdmin) return
+
+    const fetchPendingCount = () => {
+      supabase
+        .from('location_change_requests')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'pending')
+        .then(({ count }) => setPendingCount(count ?? 0))
+    }
 
     fetchPendingCount()
 
@@ -30,10 +31,15 @@ export function Navbar() {
       )
       .subscribe()
 
+    channelRef.current = channel
+
     return () => {
-      supabase.removeChannel(channel)
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current)
+        channelRef.current = null
+      }
     }
-  }, [isAdmin, fetchPendingCount])
+  }, [isAdmin])
   const navigate = useNavigate()
 
   const handleSignOut = async () => {

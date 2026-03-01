@@ -31,8 +31,13 @@ export function useLocationMembers(locationId: string | undefined) {
   const { user } = useAuth()
   const [members, setMembers] = useState<LocationMember[]>([])
   const [loading, setLoading] = useState(true)
-  const [isMember, setIsMember] = useState(false)
   const hasFetchedOnce = useRef(false)
+
+  // Derive isMember from members array instead of separate state
+  const isMember = useMemo(
+    () => (user ? members.some((m) => m.user_id === user.id) : false),
+    [members, user],
+  )
 
   const fetchMembers = useCallback(async () => {
     if (!locationId) {
@@ -74,14 +79,13 @@ export function useLocationMembers(locationId: string | undefined) {
       }))
 
       setMembers(mapped)
-      setIsMember(user ? mapped.some((m) => m.user_id === user.id) : false)
     } catch (err: unknown) {
       console.error('Error fetching location members:', err instanceof Error ? err.message : err)
     } finally {
       hasFetchedOnce.current = true
       setLoading(false)
     }
-  }, [locationId, user])
+  }, [locationId])
 
   // Debounced refetch for realtime callbacks (300ms)
   const debouncedFetch = useMemo(() => debounce(fetchMembers, 300), [fetchMembers])
@@ -96,11 +100,9 @@ export function useLocationMembers(locationId: string | undefined) {
     fetchMembers()
   }, [fetchMembers])
 
-  // Realtime subscription with polling fallback
+  // Realtime subscription (no polling — realtime is sufficient here)
   useEffect(() => {
     if (!locationId) return
-
-    let realtimeWorking = false
 
     const channel = supabase
       .channel(`memberships:${locationId}`)
@@ -112,10 +114,7 @@ export function useLocationMembers(locationId: string | undefined) {
           table: 'location_memberships',
           filter: `location_id=eq.${locationId}`,
         },
-        () => {
-          realtimeWorking = true
-          debouncedFetch()
-        },
+        () => debouncedFetch(),
       )
       .on(
         'postgres_changes',
@@ -129,23 +128,16 @@ export function useLocationMembers(locationId: string | undefined) {
           // so we subscribe to all DELETEs and check the location_id manually.
           const old = payload.old as Record<string, unknown>
           if (old.location_id !== locationId) return
-          realtimeWorking = true
           debouncedFetch()
         },
       )
       .subscribe()
 
-    // Polling fallback: only polls if Realtime isn't working
-    const pollInterval = setInterval(() => {
-      if (realtimeWorking) return
-      fetchMembers()
-    }, 10000)
-
     return () => {
-      clearInterval(pollInterval)
+      debouncedFetch.cancel()
       supabase.removeChannel(channel)
     }
-  }, [locationId, fetchMembers, debouncedFetch])
+  }, [locationId, debouncedFetch])
 
   const join = useCallback(
     async (locId: string) => {

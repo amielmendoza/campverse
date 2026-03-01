@@ -72,15 +72,23 @@ export function useChangeRequests() {
     async (requestId: string, editedChanges?: Record<string, unknown>) => {
       if (!user) return
 
-      // Get the request details
-      const request = requests.find((r) => r.id === requestId)
-      if (!request) throw new Error('Request not found')
+      // Fetch the request fresh from DB (avoids depending on state array)
+      const { data: request, error: reqError } = await supabase
+        .from('location_change_requests')
+        .select('*, locations:location_id(name), profiles:submitted_by(username, display_name)')
+        .eq('id', requestId)
+        .single()
+
+      if (reqError || !request) throw new Error('Request not found')
+
+      const locName = (request.locations as unknown as { name: string } | null)?.name ?? 'Unknown'
+      const requestChanges = request.changes as Record<string, unknown>
 
       // Apply the changes (use edited version if provided, otherwise original)
       // Security: only allow fields that were in the original request
-      let changesToApply = editedChanges ?? request.changes
+      let changesToApply = editedChanges ?? requestChanges
       if (editedChanges) {
-        const allowedKeys = new Set(Object.keys(request.changes))
+        const allowedKeys = new Set(Object.keys(requestChanges))
         const sanitized: Record<string, unknown> = {}
         for (const key of Object.keys(editedChanges)) {
           if (allowedKeys.has(key)) {
@@ -143,7 +151,7 @@ export function useChangeRequests() {
       // Audit log — only log actual diffs
       await supabase.from('location_audit_log').insert({
         location_id: request.location_id,
-        location_name: request.location_name,
+        location_name: locName,
         action: 'change_approved',
         actor_id: user.id,
         changes: { before, after: finalChanges },
@@ -152,14 +160,19 @@ export function useChangeRequests() {
 
       await fetchRequests()
     },
-    [user, requests, fetchRequests],
+    [user, fetchRequests],
   )
 
   const rejectRequest = useCallback(
     async (requestId: string, note?: string) => {
       if (!user) return
 
-      const request = requests.find((r) => r.id === requestId)
+      // Fetch the request fresh from DB
+      const { data: request } = await supabase
+        .from('location_change_requests')
+        .select('*, locations:location_id(name)')
+        .eq('id', requestId)
+        .single()
 
       const { error: statusError } = await supabase
         .from('location_change_requests')
@@ -178,19 +191,20 @@ export function useChangeRequests() {
 
       // Audit log
       if (request) {
+        const locName = (request.locations as unknown as { name: string } | null)?.name ?? 'Unknown'
         await supabase.from('location_audit_log').insert({
           location_id: request.location_id,
-          location_name: request.location_name,
+          location_name: locName,
           action: 'change_rejected',
           actor_id: user.id,
-          changes: { proposed: request.changes, reason: note || null },
+          changes: { proposed: request.changes as Record<string, unknown>, reason: note || null },
           change_request_id: requestId,
         })
       }
 
       await fetchRequests()
     },
-    [user, requests, fetchRequests],
+    [user, fetchRequests],
   )
 
   return {

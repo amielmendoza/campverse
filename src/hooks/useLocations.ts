@@ -15,6 +15,10 @@ export function useLocations() {
   const [error, setError] = useState<string | null>(null)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
+  // Stable ref for user to avoid subscription churn
+  const userRef = useRef(user)
+  userRef.current = user
+
   const fetchLocations = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -65,9 +69,10 @@ export function useLocations() {
     }
   }, [])
 
-  // Fetch unread message counts for the current user's memberships
+  // Fetch unread counts — single query using RPC-like approach instead of N+1
   const fetchUnreadCounts = useCallback(async () => {
-    if (!user) {
+    const u = userRef.current
+    if (!u) {
       setUnreadCounts({})
       return
     }
@@ -76,32 +81,48 @@ export function useLocations() {
     const { data: memberships } = await supabase
       .from('location_memberships')
       .select('location_id, last_read_at')
-      .eq('user_id', user.id)
+      .eq('user_id', u.id)
 
     if (!memberships || memberships.length === 0) {
       setUnreadCounts({})
       return
     }
 
-    // For each membership, count messages newer than last_read_at from other users
-    const counts: Record<string, number> = {}
-    await Promise.all(
-      memberships.map(async (m) => {
-        const { count } = await supabase
-          .from('messages')
-          .select('id', { count: 'exact', head: true })
-          .eq('location_id', m.location_id)
-          .gt('created_at', m.last_read_at)
-          .neq('user_id', user.id)
-
-        if (count && count > 0) {
-          counts[m.location_id] = count
-        }
-      }),
+    // Batch: fetch all recent messages across all member locations in ONE query
+    const locationIds = memberships.map((m) => m.location_id)
+    const oldestReadAt = memberships.reduce(
+      (oldest, m) => (m.last_read_at < oldest ? m.last_read_at : oldest),
+      memberships[0].last_read_at,
     )
 
+    const { data: messages } = await supabase
+      .from('messages')
+      .select('location_id, created_at')
+      .in('location_id', locationIds)
+      .gt('created_at', oldestReadAt)
+      .neq('user_id', u.id)
+
+    if (!messages || messages.length === 0) {
+      setUnreadCounts({})
+      return
+    }
+
+    // Build a lookup of last_read_at per location
+    const readAtMap: Record<string, string> = {}
+    for (const m of memberships) {
+      readAtMap[m.location_id] = m.last_read_at
+    }
+
+    // Count unread per location client-side
+    const counts: Record<string, number> = {}
+    for (const msg of messages) {
+      if (msg.created_at > readAtMap[msg.location_id]) {
+        counts[msg.location_id] = (counts[msg.location_id] ?? 0) + 1
+      }
+    }
+
     setUnreadCounts(counts)
-  }, [user])
+  }, []) // stable — reads user from ref
 
   useEffect(() => {
     fetchLocations()
@@ -110,7 +131,7 @@ export function useLocations() {
 
   // Subscribe to new messages to update unread counts in realtime
   useEffect(() => {
-    if (!user) return
+    if (!userRef.current) return
 
     const channel = supabase
       .channel('locations-unread')
@@ -129,7 +150,7 @@ export function useLocations() {
         channelRef.current = null
       }
     }
-  }, [user, fetchUnreadCounts])
+  }, [fetchUnreadCounts])
 
   return { locations, unreadCounts, loading, error, refetch: fetchLocations }
 }
