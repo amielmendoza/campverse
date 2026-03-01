@@ -85,8 +85,9 @@ export function useMessages(locationId: string | undefined) {
     [fetchMessages],
   )
 
-  // Mark chat as read for the current user
-  const markAsRead = useCallback(() => {
+  // Mark chat as read for the current user (via ref to avoid dep churn)
+  const markAsReadRef = useRef(() => {})
+  markAsReadRef.current = () => {
     if (!user || !locationId) return
     supabase
       .from('location_memberships')
@@ -94,7 +95,7 @@ export function useMessages(locationId: string | undefined) {
       .eq('user_id', user.id)
       .eq('location_id', locationId)
       .then(() => {})
-  }, [user, locationId])
+  }
 
   // Initial load
   useEffect(() => {
@@ -112,12 +113,12 @@ export function useMessages(locationId: string | undefined) {
       if (cancelled) return
       if (result) setMessages(result)
       setLoading(false)
-      markAsRead()
+      markAsReadRef.current()
     }
 
     load()
     return () => { cancelled = true }
-  }, [locationId, fetchMessages, markAsRead])
+  }, [locationId, fetchMessages])
 
   // Realtime: when ANY change happens, just refetch all messages.
   useEffect(() => {
@@ -138,7 +139,7 @@ export function useMessages(locationId: string | undefined) {
         () => {
           realtimeWorking = true
           debouncedFetchAndSet()
-          markAsRead()
+          markAsReadRef.current()
         },
       )
       .subscribe()
@@ -166,7 +167,7 @@ export function useMessages(locationId: string | undefined) {
         channelRef.current = null
       }
     }
-  }, [locationId, fetchMessages, debouncedFetchAndSet, markAsRead])
+  }, [locationId, fetchMessages, debouncedFetchAndSet])
 
   // Send: just insert. Realtime refetch will show it.
   const sendMessage = useCallback(
