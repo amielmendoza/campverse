@@ -57,7 +57,7 @@ export function ReceiptUpload({ bookingId, onUploaded, disabled }: ReceiptUpload
   return (
     <div>
       {previewUrl && (
-        <div className="mb-2 inline-block overflow-hidden rounded-lg border border-stone-200 bg-white">
+        <div className="mb-2 block overflow-hidden rounded-lg border border-stone-200 bg-white w-fit">
           <img
             src={previewUrl}
             alt="Payment receipt"
