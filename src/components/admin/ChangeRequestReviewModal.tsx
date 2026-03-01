@@ -24,7 +24,12 @@ const FIELD_LABELS: Record<string, string> = {
   is_active: 'Active',
   amenities: 'Amenities',
   gallery: 'Gallery',
+  price_per_night: 'Price per Night',
+  payment_qr_url: 'Payment QR Code',
 }
+
+// Fields whose values are image URLs — show a preview
+const IMAGE_URL_FIELDS = new Set(['image_url', 'payment_qr_url'])
 
 function formatValue(value: unknown): string {
   if (value === null || value === undefined) return '—'
@@ -45,7 +50,7 @@ const TEXTAREA_FIELDS = new Set(['description', 'rules'])
 // Fields that are boolean toggles
 const BOOLEAN_FIELDS = new Set(['is_active'])
 // Fields that are numeric
-const NUMBER_FIELDS = new Set(['latitude', 'longitude', 'capacity'])
+const NUMBER_FIELDS = new Set(['latitude', 'longitude', 'capacity', 'price_per_night'])
 // Fields that are complex (arrays/objects) — shown as JSON
 const COMPLEX_FIELDS = new Set(['amenities', 'gallery'])
 
@@ -254,15 +259,35 @@ export function ChangeRequestReviewModal({
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="mb-1 text-xs font-medium text-stone-400">Current</p>
-                      <p className="rounded bg-red-50 px-3 py-2 text-sm text-stone-700">
-                        {formatValue(currentVal)}
-                      </p>
+                      {IMAGE_URL_FIELDS.has(field) && currentVal && typeof currentVal === 'string' ? (
+                        <div>
+                          <div className="mb-1 overflow-hidden rounded-lg border border-stone-200 bg-white p-1 inline-block">
+                            <img src={currentVal} alt="Current" className="h-32 w-32 object-contain" />
+                          </div>
+                          <p className="rounded bg-red-50 px-3 py-2 text-xs text-stone-500 break-all">
+                            {currentVal}
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="rounded bg-red-50 px-3 py-2 text-sm text-stone-700">
+                          {formatValue(currentVal)}
+                        </p>
+                      )}
                     </div>
                     <div>
                       <p className="mb-1 text-xs font-medium text-stone-400">
                         Proposed {isEdited && <span className="text-blue-500">(modified)</span>}
                       </p>
-                      {renderEditableInput(field, editedVal ?? proposedVal, handleFieldChange)}
+                      {IMAGE_URL_FIELDS.has(field) && (editedVal ?? proposedVal) && typeof (editedVal ?? proposedVal) === 'string' ? (
+                        <div>
+                          <div className="mb-1 overflow-hidden rounded-lg border border-emerald-200 bg-white p-1 inline-block">
+                            <img src={String(editedVal ?? proposedVal)} alt="Proposed" className="h-32 w-32 object-contain" />
+                          </div>
+                          {renderEditableInput(field, editedVal ?? proposedVal, handleFieldChange)}
+                        </div>
+                      ) : (
+                        renderEditableInput(field, editedVal ?? proposedVal, handleFieldChange)
+                      )}
                     </div>
                   </div>
                 </div>
