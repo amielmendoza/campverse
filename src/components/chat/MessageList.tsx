@@ -10,9 +10,26 @@ interface MessageListProps {
 
 export function MessageList({ messages, currentUserId }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const prevCountRef = useRef(0)
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    // Only auto-scroll when new messages arrive (not on every refetch)
+    if (messages.length === prevCountRef.current) return
+    const isFirstLoad = prevCountRef.current === 0
+    prevCountRef.current = messages.length
+
+    const container = containerRef.current
+    if (!container) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+      return
+    }
+
+    // Auto-scroll if: first load, or user was already near the bottom
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight
+    if (isFirstLoad || distanceFromBottom < 150) {
+      bottomRef.current?.scrollIntoView({ behavior: isFirstLoad ? 'instant' : 'smooth' })
+    }
   }, [messages])
 
   if (messages.length === 0) {
@@ -28,7 +45,7 @@ export function MessageList({ messages, currentUserId }: MessageListProps) {
   let lastDateKey = ''
 
   return (
-    <div className="flex-1 space-y-3 overflow-y-auto p-4">
+    <div ref={containerRef} className="flex-1 space-y-3 overflow-y-auto p-4">
       {messages.map((message) => {
         const dateKey = getDateKey(message.created_at)
         const showDate = dateKey !== lastDateKey

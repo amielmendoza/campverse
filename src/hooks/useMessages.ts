@@ -118,15 +118,9 @@ export function useMessages(locationId: string | undefined) {
     return () => { cancelled = true }
   }, [locationId, fetchMessages, markAsRead])
 
-  // Realtime subscription + polling fallback
+  // Realtime subscription — no polling needed
   useEffect(() => {
     if (!locationId) return
-
-    const refetch = () => {
-      fetchMessages().then((result) => {
-        if (result) setMessages(result)
-      })
-    }
 
     const channel = supabase
       .channel(`messages:${locationId}`)
@@ -139,7 +133,9 @@ export function useMessages(locationId: string | undefined) {
           filter: `location_id=eq.${locationId}`,
         },
         () => {
-          refetch()
+          fetchMessages().then((result) => {
+            if (result) setMessages(result)
+          })
           markAsRead()
         },
       )
@@ -147,13 +143,7 @@ export function useMessages(locationId: string | undefined) {
 
     channelRef.current = channel
 
-    // Polling fallback — always active as a safety net
-    const poll = setInterval(() => {
-      refetch()
-    }, 5000)
-
     return () => {
-      clearInterval(poll)
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current)
         channelRef.current = null
