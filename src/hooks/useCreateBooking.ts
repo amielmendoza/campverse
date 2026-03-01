@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { guardedMutation } from '../lib/mutationGuard'
+import type { RateSelection } from '../lib/types'
 
 export function useCreateBooking() {
   const { user } = useAuth()
@@ -15,6 +16,7 @@ export function useCreateBooking() {
       checkOut: string,
       guests: number,
       totalPrice: number,
+      rateSelections?: RateSelection[],
     ) => {
       if (!user) throw new Error('Must be signed in to book')
 
@@ -32,6 +34,7 @@ export function useCreateBooking() {
               check_out: checkOut,
               guests,
               total_price: totalPrice,
+              rate_selections: rateSelections as unknown as Record<string, unknown>[] | undefined,
             })
             .select('id')
             .single()

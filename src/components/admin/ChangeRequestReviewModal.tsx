@@ -26,6 +26,7 @@ const FIELD_LABELS: Record<string, string> = {
   gallery: 'Gallery',
   price_per_night: 'Price per Night',
   payment_qr_url: 'Payment QR Code',
+  rate_options: 'Rate Options',
 }
 
 // Fields whose values are image URLs — show a preview
@@ -52,7 +53,7 @@ const BOOLEAN_FIELDS = new Set(['is_active'])
 // Fields that are numeric
 const NUMBER_FIELDS = new Set(['latitude', 'longitude', 'capacity', 'price_per_night'])
 // Fields that are complex (arrays/objects) — shown as JSON
-const COMPLEX_FIELDS = new Set(['amenities', 'gallery'])
+const COMPLEX_FIELDS = new Set(['amenities', 'gallery', 'rate_options'])
 
 function renderEditableInput(
   field: string,

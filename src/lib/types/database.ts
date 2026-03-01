@@ -64,6 +64,7 @@ export interface Database {
           owner_id: string | null
           price_per_night: number | null
           payment_qr_url: string | null
+          rate_options: Record<string, unknown>[] | null
           is_active: boolean
           created_at: string
           updated_at: string
@@ -84,6 +85,7 @@ export interface Database {
           owner_id?: string | null
           price_per_night?: number | null
           payment_qr_url?: string | null
+          rate_options?: Record<string, unknown>[] | null
           is_active?: boolean
           created_at?: string
           updated_at?: string
@@ -104,6 +106,7 @@ export interface Database {
           owner_id?: string | null
           price_per_night?: number | null
           payment_qr_url?: string | null
+          rate_options?: Record<string, unknown>[] | null
           is_active?: boolean
           created_at?: string
           updated_at?: string
@@ -251,6 +254,7 @@ export interface Database {
           status: 'pending_payment' | 'pending_confirmation' | 'confirmed' | 'completed' | 'cancelled' | 'rejected'
           owner_note: string | null
           receipt_url: string | null
+          rate_selections: Record<string, unknown>[] | null
           created_at: string
           updated_at: string
         }
@@ -265,6 +269,7 @@ export interface Database {
           status?: string
           owner_note?: string | null
           receipt_url?: string | null
+          rate_selections?: Record<string, unknown>[] | null
           created_at?: string
           updated_at?: string
         }
@@ -279,6 +284,7 @@ export interface Database {
           status?: string
           owner_note?: string | null
           receipt_url?: string | null
+          rate_selections?: Record<string, unknown>[] | null
           created_at?: string
           updated_at?: string
         }

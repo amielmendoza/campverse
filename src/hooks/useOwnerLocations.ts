@@ -104,6 +104,8 @@ export function useOwnerLocations() {
         changes.price_per_night = data.price_per_night
       if (data.payment_qr_url !== undefined && changed(data.payment_qr_url, currentLocation.payment_qr_url))
         changes.payment_qr_url = data.payment_qr_url
+      if (data.rate_options !== undefined && changed(data.rate_options, currentLocation.rate_options))
+        changes.rate_options = data.rate_options
 
       if (Object.keys(changes).length === 0) {
         throw new Error('No changes detected.')

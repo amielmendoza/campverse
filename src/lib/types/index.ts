@@ -9,3 +9,13 @@ export type LocationMembership = Database['public']['Tables']['location_membersh
 export type Message = Database['public']['Tables']['messages']['Row']
 export type Booking = Database['public']['Tables']['bookings']['Row']
 export type BookingStatus = Booking['status']
+
+export interface RateOption {
+  label: string
+  price: number
+  per: 'night' | 'stay'
+}
+
+export interface RateSelection extends RateOption {
+  quantity: number
+}

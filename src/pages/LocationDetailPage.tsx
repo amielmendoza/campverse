@@ -162,16 +162,16 @@ export function LocationDetailPage() {
         isMember={isMember}
         onJoin={handleJoin}
         onLeave={handleLeave}
-        onBook={location.price_per_night != null && location.payment_qr_url ? () => setBookingOpen(true) : undefined}
+        onBook={((location.rate_options && Array.isArray(location.rate_options) && location.rate_options.length > 0) || location.price_per_night != null) && location.payment_qr_url ? () => setBookingOpen(true) : undefined}
         loading={actionLoading}
       />
 
-      {location.price_per_night != null && location.payment_qr_url && (
+      {((location.rate_options && Array.isArray(location.rate_options) && location.rate_options.length > 0) || location.price_per_night != null) && location.payment_qr_url && (
         <BookingFormModal
           isOpen={bookingOpen}
           onClose={() => setBookingOpen(false)}
-          onSubmit={async (checkIn, checkOut, guests, totalPrice) => {
-            return await createBooking(location.id, checkIn, checkOut, guests, totalPrice)
+          onSubmit={async (checkIn, checkOut, guests, totalPrice, rateSelections) => {
+            return await createBooking(location.id, checkIn, checkOut, guests, totalPrice, rateSelections)
           }}
           onMarkPaid={markPaymentSubmitted}
           location={location}

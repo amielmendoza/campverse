@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import type { Location } from '../../lib/types'
+import type { Location, RateOption, RateSelection } from '../../lib/types'
 import { inputClassName, labelClassName } from '../../lib/utils/styles'
 import { useFocusTrap } from '../../lib/utils/useFocusTrap'
 import { CloseIcon } from '../ui/CloseIcon'
@@ -8,7 +8,7 @@ import { ReceiptUpload } from './ReceiptUpload'
 interface BookingFormModalProps {
   isOpen: boolean
   onClose: () => void
-  onSubmit: (checkIn: string, checkOut: string, guests: number, totalPrice: number) => Promise<string>
+  onSubmit: (checkIn: string, checkOut: string, guests: number, totalPrice: number, rateSelections: RateSelection[]) => Promise<string>
   onMarkPaid: (bookingId: string, receiptUrl: string) => Promise<void>
   location: Location
 }
@@ -23,25 +23,50 @@ function getTodayStr(): string {
   return new Date().toISOString().split('T')[0]
 }
 
+function getRateOptions(location: Location): RateOption[] {
+  if (location.rate_options && Array.isArray(location.rate_options) && location.rate_options.length > 0) {
+    return location.rate_options as unknown as RateOption[]
+  }
+  // Legacy fallback
+  if (location.price_per_night != null) {
+    return [{ label: 'Per Night', price: location.price_per_night, per: 'night' as const }]
+  }
+  return []
+}
+
 type Step = 'form' | 'payment' | 'done'
 
 export function BookingFormModal({ isOpen, onClose, onSubmit, onMarkPaid, location }: BookingFormModalProps) {
   const trapRef = useFocusTrap(isOpen)
   const today = getTodayStr()
 
+  const rateOptions = getRateOptions(location)
+
   const [checkIn, setCheckIn] = useState(today)
   const [checkOut, setCheckOut] = useState('')
   const [guests, setGuests] = useState('1')
+  const [quantities, setQuantities] = useState<Record<number, number>>({})
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [step, setStep] = useState<Step>('form')
   const [bookingId, setBookingId] = useState<string | null>(null)
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null)
 
-  const pricePerNight = location.price_per_night ?? 0
   const nights = getNights(checkIn, checkOut)
-  const guestCount = parseInt(guests, 10) || 1
-  const totalPrice = nights * guestCount * pricePerNight
+
+  // Compute total from rate selections
+  const selections: RateSelection[] = rateOptions
+    .map((opt, i) => ({ ...opt, quantity: quantities[i] || 0 }))
+    .filter((s) => s.quantity > 0)
+
+  const totalPrice = selections.reduce((sum, s) => {
+    const multiplier = s.per === 'night' ? nights : 1
+    return sum + s.price * s.quantity * multiplier
+  }, 0)
+
+  function setQuantity(index: number, value: number) {
+    setQuantities((prev) => ({ ...prev, [index]: Math.max(0, value) }))
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -68,10 +93,14 @@ export function BookingFormModal({ isOpen, onClose, onSubmit, onMarkPaid, locati
       setError(`This campsite has a maximum capacity of ${location.capacity} guests.`)
       return
     }
+    if (selections.length === 0) {
+      setError('Please select at least one rate option.')
+      return
+    }
 
     setSubmitting(true)
     try {
-      const id = await onSubmit(checkIn, checkOut, guestCount, totalPrice)
+      const id = await onSubmit(checkIn, checkOut, guestCount, totalPrice, selections)
       setBookingId(id)
       setStep('payment')
     } catch (err) {
@@ -101,6 +130,7 @@ export function BookingFormModal({ isOpen, onClose, onSubmit, onMarkPaid, locati
     setCheckIn(today)
     setCheckOut('')
     setGuests('1')
+    setQuantities({})
     setBookingId(null)
     setReceiptUrl(null)
     onClose()
@@ -168,9 +198,21 @@ export function BookingFormModal({ isOpen, onClose, onSubmit, onMarkPaid, locati
 
               {/* Summary */}
               <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
-                <div className="flex items-center justify-between text-sm text-stone-600">
-                  <span>PHP {pricePerNight.toLocaleString()} x {guestCount} guest{guestCount > 1 ? 's' : ''} x {nights} night{nights > 1 ? 's' : ''}</span>
-                  <span className="font-semibold text-stone-900">PHP {totalPrice.toLocaleString()}</span>
+                <div className="space-y-1 text-sm text-stone-600">
+                  {selections.map((s, i) => {
+                    const multiplier = s.per === 'night' ? nights : 1
+                    const lineTotal = s.price * s.quantity * multiplier
+                    return (
+                      <div key={i} className="flex justify-between">
+                        <span>{s.label} x {s.quantity}{s.per === 'night' ? ` x ${nights} night${nights > 1 ? 's' : ''}` : ''}</span>
+                        <span>PHP {lineTotal.toLocaleString()}</span>
+                      </div>
+                    )
+                  })}
+                  <div className="flex justify-between border-t border-stone-300 pt-1 font-semibold text-stone-900">
+                    <span>Total</span>
+                    <span>PHP {totalPrice.toLocaleString()}</span>
+                  </div>
                 </div>
               </div>
 
@@ -238,13 +280,6 @@ export function BookingFormModal({ isOpen, onClose, onSubmit, onMarkPaid, locati
                 <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>
               )}
 
-              {/* Price info */}
-              <div className="rounded-lg bg-emerald-50 p-3">
-                <p className="text-sm font-medium text-emerald-800">
-                  PHP {pricePerNight.toLocaleString()} / guest / night
-                </p>
-              </div>
-
               {/* Dates */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
@@ -297,12 +332,53 @@ export function BookingFormModal({ isOpen, onClose, onSubmit, onMarkPaid, locati
                 )}
               </div>
 
+              {/* Rate options */}
+              <div>
+                <label className={labelClassName}>Select Rates</label>
+                <div className="space-y-2">
+                  {rateOptions.map((opt, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center justify-between rounded-lg border border-stone-200 bg-white px-4 py-3"
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-stone-900">{opt.label}</p>
+                        <p className="text-xs text-stone-500">
+                          PHP {opt.price.toLocaleString()} / {opt.per}
+                        </p>
+                      </div>
+                      <input
+                        type="number"
+                        min="0"
+                        value={quantities[i] || ''}
+                        onChange={(e) => setQuantity(i, parseInt(e.target.value, 10) || 0)}
+                        disabled={submitting}
+                        className="w-20 rounded-lg border border-stone-300 px-3 py-1.5 text-center text-sm focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                        placeholder="0"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               {/* Total */}
-              {nights > 0 && (
+              {totalPrice > 0 && nights > 0 && (
                 <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
-                  <div className="flex items-center justify-between text-sm text-stone-600">
-                    <span>PHP {pricePerNight.toLocaleString()} x {guestCount} guest{guestCount > 1 ? 's' : ''} x {nights} night{nights > 1 ? 's' : ''}</span>
-                    <span className="font-semibold text-stone-900">PHP {totalPrice.toLocaleString()}</span>
+                  <div className="space-y-1 text-sm text-stone-600">
+                    {selections.map((s, i) => {
+                      const multiplier = s.per === 'night' ? nights : 1
+                      const lineTotal = s.price * s.quantity * multiplier
+                      return (
+                        <div key={i} className="flex justify-between">
+                          <span>{s.label} x {s.quantity}{s.per === 'night' ? ` x ${nights} night${nights > 1 ? 's' : ''}` : ''}</span>
+                          <span>PHP {lineTotal.toLocaleString()}</span>
+                        </div>
+                      )
+                    })}
+                    <div className="flex justify-between border-t border-stone-300 pt-1 font-semibold text-stone-900">
+                      <span>Total</span>
+                      <span>PHP {totalPrice.toLocaleString()}</span>
+                    </div>
                   </div>
                 </div>
               )}
@@ -320,7 +396,7 @@ export function BookingFormModal({ isOpen, onClose, onSubmit, onMarkPaid, locati
               </button>
               <button
                 type="submit"
-                disabled={submitting || nights <= 0}
+                disabled={submitting || nights <= 0 || selections.length === 0}
                 className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
               >
                 {submitting ? (
@@ -329,7 +405,7 @@ export function BookingFormModal({ isOpen, onClose, onSubmit, onMarkPaid, locati
                     Booking...
                   </span>
                 ) : (
-                  'Proceed to Payment'
+                  `Proceed to Payment — PHP ${totalPrice.toLocaleString()}`
                 )}
               </button>
             </div>

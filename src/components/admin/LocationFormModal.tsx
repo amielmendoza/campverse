@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import type { Location } from '../../lib/types'
+import type { Location, RateOption } from '../../lib/types'
 import type { AmenityItem } from '../../lib/types'
 import type { LocationFormData } from '../../hooks/useAdminLocations'
 import { useAuth } from '../../contexts/AuthContext'
@@ -46,7 +46,7 @@ export function LocationFormModal({
   const [capacity, setCapacity] = useState('')
   const [rules, setRules] = useState('')
   const [ownerId, setOwnerId] = useState<string>('')
-  const [pricePerNight, setPricePerNight] = useState('')
+  const [rateOptions, setRateOptions] = useState<RateOption[]>([])
   const [paymentQrUrl, setPaymentQrUrl] = useState('')
   const [isActive, setIsActive] = useState(true)
 
@@ -70,7 +70,14 @@ export function LocationFormModal({
       setCapacity(initialData.capacity != null ? String(initialData.capacity) : '')
       setRules(initialData.rules ?? '')
       setOwnerId(initialData.owner_id ?? '')
-      setPricePerNight(initialData.price_per_night != null ? String(initialData.price_per_night) : '')
+      // Load rate_options, falling back to converting legacy price_per_night
+      if (initialData.rate_options && Array.isArray(initialData.rate_options) && initialData.rate_options.length > 0) {
+        setRateOptions(initialData.rate_options as unknown as RateOption[])
+      } else if (initialData.price_per_night != null) {
+        setRateOptions([{ label: 'Per Night', price: initialData.price_per_night, per: 'night' }])
+      } else {
+        setRateOptions([])
+      }
       setPaymentQrUrl(initialData.payment_qr_url ?? '')
       setIsActive(initialData.is_active ?? true)
     } else {
@@ -86,7 +93,7 @@ export function LocationFormModal({
       setCapacity('')
       setRules('')
       setOwnerId('')
-      setPricePerNight('')
+      setRateOptions([])
       setPaymentQrUrl('')
       setIsActive(true)
     }
@@ -137,6 +144,18 @@ export function LocationFormModal({
     setGallery(gallery.filter((_, i) => i !== index))
   }
 
+  function addRateOption() {
+    setRateOptions([...rateOptions, { label: '', price: 0, per: 'night' }])
+  }
+
+  function updateRateOption(index: number, field: keyof RateOption, value: string | number) {
+    setRateOptions(rateOptions.map((r, i) => (i === index ? { ...r, [field]: value } : r)))
+  }
+
+  function removeRateOption(index: number) {
+    setRateOptions(rateOptions.filter((_, i) => i !== index))
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
@@ -163,6 +182,15 @@ export function LocationFormModal({
     }
 
     const validAmenities = amenities.filter((a) => a.name.trim())
+    const validRateOptions = rateOptions.filter((r) => r.label.trim() && r.price > 0)
+
+    // Validate rate options
+    for (const opt of validRateOptions) {
+      if (isNaN(opt.price) || opt.price <= 0) {
+        setError(`Rate "${opt.label}" must have a positive price.`)
+        return
+      }
+    }
 
     const formData: LocationFormData = {
       name: name.trim(),
@@ -177,8 +205,9 @@ export function LocationFormModal({
       capacity: capacity.trim() ? parseInt(capacity, 10) : null,
       rules: rules.trim(),
       owner_id: ownerId || null,
-      price_per_night: pricePerNight.trim() ? parseFloat(pricePerNight) : null,
+      price_per_night: null,
       payment_qr_url: paymentQrUrl.trim() || null,
+      rate_options: validRateOptions.length > 0 ? validRateOptions : null,
       is_active: isActive,
     }
 
@@ -206,11 +235,6 @@ export function LocationFormModal({
       setError('Capacity cannot be negative.')
       return
     }
-    if (formData.price_per_night != null && (isNaN(formData.price_per_night) || formData.price_per_night <= 0)) {
-      setError('Price per night must be a positive number.')
-      return
-    }
-
     setSubmitting(true)
     try {
       await onSubmit(formData)
@@ -574,26 +598,69 @@ export function LocationFormModal({
             <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
               <h3 className="mb-3 text-sm font-semibold text-stone-800">Booking Setup</h3>
               <div className="space-y-4">
+                {/* Rate Options */}
                 <div>
-                  <label htmlFor="loc-price" className={labelClassName}>
-                    Price per Night
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-stone-400">PHP</span>
-                    <input
-                      id="loc-price"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={pricePerNight}
-                      onChange={(e) => setPricePerNight(e.target.value)}
-                      disabled={submitting}
-                      className={inputClassName + ' pl-12'}
-                      placeholder="500.00"
-                    />
+                  <label className={labelClassName}>Rate Options</label>
+                  <p className="mb-2 text-xs text-stone-400">
+                    Define how campers pay — per tent, per person, per car, etc. Leave empty if not bookable.
+                  </p>
+                  <div className="space-y-2">
+                    {rateOptions.map((opt, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={opt.label}
+                          onChange={(e) => updateRateOption(i, 'label', e.target.value)}
+                          disabled={submitting}
+                          className={inputClassName}
+                          placeholder="e.g. Tent Rental, Per Person"
+                        />
+                        <div className="relative shrink-0">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-stone-400">PHP</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={opt.price || ''}
+                            onChange={(e) => updateRateOption(i, 'price', parseFloat(e.target.value) || 0)}
+                            disabled={submitting}
+                            className={inputClassName + ' w-28 pl-10'}
+                            placeholder="0"
+                          />
+                        </div>
+                        <select
+                          value={opt.per}
+                          onChange={(e) => updateRateOption(i, 'per', e.target.value)}
+                          disabled={submitting}
+                          className={inputClassName + ' w-28 shrink-0'}
+                        >
+                          <option value="night">/ night</option>
+                          <option value="stay">/ stay</option>
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => removeRateOption(i)}
+                          disabled={submitting}
+                          className="shrink-0 text-red-500 hover:text-red-700 disabled:opacity-50"
+                        >
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                  <p className="mt-1 text-xs text-stone-400">Leave empty if this location is not bookable.</p>
+                  <button
+                    type="button"
+                    onClick={addRateOption}
+                    disabled={submitting}
+                    className="mt-2 rounded-md border border-dashed border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-500 transition-colors hover:border-stone-400 hover:text-stone-700"
+                  >
+                    + Add Rate
+                  </button>
                 </div>
+
+                {/* Payment QR */}
                 <div>
                   <label className={labelClassName}>Payment QR Code</label>
                   <PaymentQrUpload

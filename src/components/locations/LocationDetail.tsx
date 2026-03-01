@@ -412,14 +412,25 @@ export function LocationDetail({
 
             <hr className="mb-4 border-stone-200" />
 
-            {location.price_per_night != null && (
+            {location.rate_options && Array.isArray(location.rate_options) && location.rate_options.length > 0 ? (
+              <div className="mb-4 space-y-1.5">
+                {(location.rate_options as unknown as { label: string; price: number; per: string }[]).map((opt, i) => (
+                  <div key={i} className="flex items-baseline justify-between">
+                    <span className="text-sm text-stone-600">{opt.label}</span>
+                    <span className="text-sm font-semibold text-stone-900">
+                      PHP {opt.price.toLocaleString()} <span className="font-normal text-stone-500">/ {opt.per}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : location.price_per_night != null ? (
               <div className="mb-4 flex items-baseline gap-1">
                 <span className="text-2xl font-bold text-stone-900">
                   PHP {location.price_per_night.toLocaleString()}
                 </span>
-                <span className="text-sm text-stone-500">/ guest / night</span>
+                <span className="text-sm text-stone-500">/ night</span>
               </div>
-            )}
+            ) : null}
 
             <div className="mb-4 space-y-3 text-sm text-stone-600">
               <div className="flex items-center justify-between">
@@ -440,7 +451,7 @@ export function LocationDetail({
               )}
             </div>
 
-            {location.price_per_night != null && location.payment_qr_url && onBook && (
+            {onBook && (
               <button
                 onClick={onBook}
                 disabled={loading}
@@ -456,7 +467,7 @@ export function LocationDetail({
               className={`w-full cursor-pointer rounded-lg px-5 py-3 text-base font-semibold text-white transition-all disabled:cursor-not-allowed disabled:opacity-50 ${
                 isMember
                   ? 'bg-rose-500 hover:bg-rose-600'
-                  : location.price_per_night != null && location.payment_qr_url
+                  : onBook
                     ? 'border border-stone-300 bg-white !text-stone-700 hover:bg-stone-50'
                     : 'bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600'
               }`}
