@@ -417,7 +417,7 @@ export function LocationDetail({
                 <span className="text-2xl font-bold text-stone-900">
                   PHP {location.price_per_night.toLocaleString()}
                 </span>
-                <span className="text-sm text-stone-500">/ night</span>
+                <span className="text-sm text-stone-500">/ guest / night</span>
               </div>
             )}
 

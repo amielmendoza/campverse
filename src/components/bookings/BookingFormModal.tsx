@@ -40,7 +40,8 @@ export function BookingFormModal({ isOpen, onClose, onSubmit, onMarkPaid, locati
 
   const pricePerNight = location.price_per_night ?? 0
   const nights = getNights(checkIn, checkOut)
-  const totalPrice = nights * pricePerNight
+  const guestCount = parseInt(guests, 10) || 1
+  const totalPrice = nights * guestCount * pricePerNight
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -168,7 +169,7 @@ export function BookingFormModal({ isOpen, onClose, onSubmit, onMarkPaid, locati
               {/* Summary */}
               <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
                 <div className="flex items-center justify-between text-sm text-stone-600">
-                  <span>PHP {pricePerNight.toLocaleString()} x {nights} night{nights > 1 ? 's' : ''}</span>
+                  <span>PHP {pricePerNight.toLocaleString()} x {guestCount} guest{guestCount > 1 ? 's' : ''} x {nights} night{nights > 1 ? 's' : ''}</span>
                   <span className="font-semibold text-stone-900">PHP {totalPrice.toLocaleString()}</span>
                 </div>
               </div>
@@ -240,7 +241,7 @@ export function BookingFormModal({ isOpen, onClose, onSubmit, onMarkPaid, locati
               {/* Price info */}
               <div className="rounded-lg bg-emerald-50 p-3">
                 <p className="text-sm font-medium text-emerald-800">
-                  PHP {pricePerNight.toLocaleString()} / night
+                  PHP {pricePerNight.toLocaleString()} / guest / night
                 </p>
               </div>
 
@@ -300,7 +301,7 @@ export function BookingFormModal({ isOpen, onClose, onSubmit, onMarkPaid, locati
               {nights > 0 && (
                 <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
                   <div className="flex items-center justify-between text-sm text-stone-600">
-                    <span>PHP {pricePerNight.toLocaleString()} x {nights} night{nights > 1 ? 's' : ''}</span>
+                    <span>PHP {pricePerNight.toLocaleString()} x {guestCount} guest{guestCount > 1 ? 's' : ''} x {nights} night{nights > 1 ? 's' : ''}</span>
                     <span className="font-semibold text-stone-900">PHP {totalPrice.toLocaleString()}</span>
                   </div>
                 </div>
