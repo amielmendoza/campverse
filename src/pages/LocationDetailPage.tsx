@@ -1,18 +1,20 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocationMembers } from '../hooks/useLocationMembers'
+import { cachedQuery } from '../lib/queryCache'
 import type { LocationWithCount } from '../hooks/useLocations'
 import { LocationDetail } from '../components/locations/LocationDetail'
 import { MemberList } from '../components/locations/MemberList'
 import { ChatRoom } from '../components/chat/ChatRoom'
 import { LoadingSpinner } from '../components/ui/LoadingSpinner'
+import type { Location } from '../lib/types'
 
 export function LocationDetailPage() {
   const { slug } = useParams<{ slug: string }>()
   const { isOwner } = useAuth()
-  const [location, setLocation] = useState<LocationWithCount | null>(null)
+  const [locationData, setLocationData] = useState<Location | null>(null)
   const [pageLoading, setPageLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -25,29 +27,31 @@ export function LocationDetailPage() {
       setPageLoading(true)
       setError(null)
 
-      const { data, error: fetchError } = await supabase
-        .from('locations')
-        .select('*')
-        .eq('slug', slug!)
-        .single()
+      try {
+        const data = await cachedQuery(
+          `location:slug:${slug}`,
+          async () => {
+            const { data, error: fetchError } = await supabase
+              .from('locations')
+              .select('*')
+              .eq('slug', slug!)
+              .single()
 
-      if (cancelled) return
+            if (fetchError || !data) throw new Error('Location not found.')
+            return data
+          },
+          { ttl: 60_000, staleWhileRevalidate: true },
+          (freshData) => setLocationData(freshData),
+        )
 
-      if (fetchError || !data) {
+        if (cancelled) return
+        setLocationData(data)
+      } catch {
+        if (cancelled) return
         setError('Location not found.')
-        setPageLoading(false)
-        return
+      } finally {
+        if (!cancelled) setPageLoading(false)
       }
-
-      const { count } = await supabase
-        .from('location_memberships')
-        .select('*', { count: 'exact', head: true })
-        .eq('location_id', data.id)
-
-      if (cancelled) return
-
-      setLocation({ ...data, memberCount: count ?? 0 })
-      setPageLoading(false)
     }
 
     fetchLocation()
@@ -58,7 +62,13 @@ export function LocationDetailPage() {
   }, [slug])
 
   const { members, isMember, loading: membersLoading, join, leave } =
-    useLocationMembers(location?.id)
+    useLocationMembers(locationData?.id)
+
+  // Derive member count from members array (no separate query needed)
+  const location: LocationWithCount | null = useMemo(
+    () => locationData ? { ...locationData, memberCount: members.length } : null,
+    [locationData, members.length],
+  )
 
   const [actionLoading, setActionLoading] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -69,9 +79,6 @@ export function LocationDetailPage() {
     setActionError(null)
     try {
       await join(location.id)
-      setLocation((prev) =>
-        prev ? { ...prev, memberCount: prev.memberCount + 1 } : prev,
-      )
     } catch (err) {
       console.error('Failed to join:', err)
       setActionError(err instanceof Error ? err.message : 'Failed to join location.')
@@ -86,9 +93,6 @@ export function LocationDetailPage() {
     setActionError(null)
     try {
       await leave(location.id)
-      setLocation((prev) =>
-        prev ? { ...prev, memberCount: Math.max(0, prev.memberCount - 1) } : prev,
-      )
     } catch (err) {
       console.error('Failed to leave:', err)
       setActionError(err instanceof Error ? err.message : 'Failed to leave location.')

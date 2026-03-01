@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { MESSAGES_PER_PAGE } from '../lib/constants'
+import { guardedMutation } from '../lib/mutationGuard'
+import { invalidateCacheKey } from '../lib/queryCache'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
 export interface MessageWithProfile {
@@ -151,54 +153,57 @@ export function useMessages(locationId: string | undefined) {
     }
   }, [locationId, fetchMessages, markAsRead])
 
-  // Send: optimistic update + verified insert
+  // Send: guarded + optimistic update + verified insert
   const sendMessage = useCallback(
     async (content: string) => {
       if (!user) throw new Error('Must be signed in to send a message')
       if (!locationId) throw new Error('No location specified')
 
-      // Optimistic: add message to the list immediately
-      const optimisticId = `optimistic-${Date.now()}`
-      const optimisticMsg: MessageWithProfile = {
-        id: optimisticId,
-        location_id: locationId,
-        user_id: user.id,
-        content,
-        created_at: new Date().toISOString(),
-        profile: {
-          username: profile?.username ?? '',
-          display_name: profile?.display_name ?? null,
-          avatar_url: profile?.avatar_url ?? null,
-        },
-      }
-      setMessages((prev) => [...prev, optimisticMsg])
-
-      // Use .select() to confirm the row was actually inserted (detects silent RLS rejections)
-      const { data: inserted, error } = await supabase
-        .from('messages')
-        .insert({
+      await guardedMutation(`send:${locationId}:${Date.now()}`, async () => {
+        // Optimistic: add message to the list immediately
+        const optimisticId = `optimistic-${Date.now()}`
+        const optimisticMsg: MessageWithProfile = {
+          id: optimisticId,
           location_id: locationId,
           user_id: user.id,
           content,
-        })
-        .select('id')
-        .single()
+          created_at: new Date().toISOString(),
+          profile: {
+            username: profile?.username ?? '',
+            display_name: profile?.display_name ?? null,
+            avatar_url: profile?.avatar_url ?? null,
+          },
+        }
+        setMessages((prev) => [...prev, optimisticMsg])
 
-      if (error || !inserted) {
-        console.error('Message insert failed:', error)
-        // Rollback optimistic update
-        setMessages((prev) => prev.filter((m) => m.id !== optimisticId))
-        throw error ?? new Error('Message was not saved')
-      }
+        // Use .select() to confirm the row was actually inserted (detects silent RLS rejections)
+        const { data: inserted, error } = await supabase
+          .from('messages')
+          .insert({
+            location_id: locationId,
+            user_id: user.id,
+            content,
+          })
+          .select('id')
+          .single()
 
-      // Replace optimistic ID with real ID so polling/realtime won't duplicate
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === optimisticId ? { ...m, id: inserted.id } : m,
-        ),
-      )
+        if (error || !inserted) {
+          console.error('Message insert failed:', error)
+          setMessages((prev) => prev.filter((m) => m.id !== optimisticId))
+          throw error ?? new Error('Message was not saved')
+        }
 
-      markAsRead()
+        // Replace optimistic ID with real ID so realtime won't duplicate
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === optimisticId ? { ...m, id: inserted.id } : m,
+          ),
+        )
+
+        // Invalidate unread counts cache so other views update
+        invalidateCacheKey(`unread:${user.id}`)
+        markAsRead()
+      })
     },
     [user, locationId, profile, markAsRead],
   )

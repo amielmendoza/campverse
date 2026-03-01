@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { debounce } from '../lib/utils/debounce'
+import { cachedQuery, invalidateCacheKey } from '../lib/queryCache'
+import { guardedMutation } from '../lib/mutationGuard'
 
 interface MembershipRow {
   id: string
@@ -49,34 +51,41 @@ export function useLocationMembers(locationId: string | undefined) {
     if (!hasFetchedOnce.current) setLoading(true)
 
     try {
-      const { data, error } = await supabase
-        .from('location_memberships')
-        .select(`
-          id,
-          user_id,
-          location_id,
-          joined_at,
-          profiles!location_memberships_user_id_fkey (
-            username,
-            display_name,
-            avatar_url
-          )
-        `)
-        .eq('location_id', locationId)
+      const mapped = await cachedQuery(
+        `members:${locationId}`,
+        async () => {
+          const { data, error } = await supabase
+            .from('location_memberships')
+            .select(`
+              id,
+              user_id,
+              location_id,
+              joined_at,
+              profiles!location_memberships_user_id_fkey (
+                username,
+                display_name,
+                avatar_url
+              )
+            `)
+            .eq('location_id', locationId)
 
-      if (error) throw error
+          if (error) throw error
 
-      const mapped: LocationMember[] = (data ?? []).map((row: MembershipRow) => ({
-        id: row.id,
-        user_id: row.user_id,
-        location_id: row.location_id,
-        joined_at: row.joined_at,
-        profile: {
-          username: row.profiles?.username ?? '',
-          display_name: row.profiles?.display_name ?? null,
-          avatar_url: row.profiles?.avatar_url ?? null,
+          return (data ?? []).map((row: MembershipRow) => ({
+            id: row.id,
+            user_id: row.user_id,
+            location_id: row.location_id,
+            joined_at: row.joined_at,
+            profile: {
+              username: row.profiles?.username ?? '',
+              display_name: row.profiles?.display_name ?? null,
+              avatar_url: row.profiles?.avatar_url ?? null,
+            },
+          }))
         },
-      }))
+        { ttl: 30_000, staleWhileRevalidate: true },
+        (freshData) => setMembers(freshData),
+      )
 
       setMembers(mapped)
     } catch (err: unknown) {
@@ -143,13 +152,17 @@ export function useLocationMembers(locationId: string | undefined) {
     async (locId: string) => {
       if (!user) throw new Error('Must be signed in to join a location')
 
-      const { error } = await supabase.from('location_memberships').insert({
-        user_id: user.id,
-        location_id: locId,
-      })
+      await guardedMutation(`join:${locId}`, async () => {
+        const { error } = await supabase.from('location_memberships').insert({
+          user_id: user.id,
+          location_id: locId,
+        })
 
-      if (error) throw error
-      await fetchMembers()
+        if (error) throw error
+        invalidateCacheKey(`members:${locId}`)
+        invalidateCacheKey('locations:list')
+        await fetchMembers()
+      })
     },
     [user, fetchMembers],
   )
@@ -158,14 +171,18 @@ export function useLocationMembers(locationId: string | undefined) {
     async (locId: string) => {
       if (!user) throw new Error('Must be signed in to leave a location')
 
-      const { error } = await supabase
-        .from('location_memberships')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('location_id', locId)
+      await guardedMutation(`leave:${locId}`, async () => {
+        const { error } = await supabase
+          .from('location_memberships')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('location_id', locId)
 
-      if (error) throw error
-      await fetchMembers()
+        if (error) throw error
+        invalidateCacheKey(`members:${locId}`)
+        invalidateCacheKey('locations:list')
+        await fetchMembers()
+      })
     },
     [user, fetchMembers],
   )

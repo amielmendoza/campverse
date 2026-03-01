@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { guardedMutation } from '../lib/mutationGuard'
+import { invalidateCacheKey } from '../lib/queryCache'
 
 export interface ChangeRequestWithDetails {
   id: string
@@ -72,6 +74,7 @@ export function useChangeRequests() {
     async (requestId: string, editedChanges?: Record<string, unknown>) => {
       if (!user) return
 
+      await guardedMutation(`approve:${requestId}`, async () => {
       // Fetch the request fresh from DB (avoids depending on state array)
       const { data: request, error: reqError } = await supabase
         .from('location_change_requests')
@@ -158,7 +161,9 @@ export function useChangeRequests() {
         change_request_id: requestId,
       })
 
+      invalidateCacheKey('locations:list')
       await fetchRequests()
+      }) // end guardedMutation
     },
     [user, fetchRequests],
   )
@@ -167,6 +172,7 @@ export function useChangeRequests() {
     async (requestId: string, note?: string) => {
       if (!user) return
 
+      await guardedMutation(`reject:${requestId}`, async () => {
       // Fetch the request fresh from DB
       const { data: request } = await supabase
         .from('location_change_requests')
@@ -203,6 +209,7 @@ export function useChangeRequests() {
       }
 
       await fetchRequests()
+      }) // end guardedMutation
     },
     [user, fetchRequests],
   )
