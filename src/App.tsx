@@ -15,7 +15,6 @@ const NotFoundPage = lazy(() => import('./pages/NotFoundPage').then(m => ({ defa
 const AdminLocationsPage = lazy(() => import('./pages/AdminLocationsPage').then(m => ({ default: m.AdminLocationsPage })))
 const MyLocationsPage = lazy(() => import('./pages/MyLocationsPage').then(m => ({ default: m.MyLocationsPage })))
 const MyBookingsPage = lazy(() => import('./pages/MyBookingsPage').then(m => ({ default: m.MyBookingsPage })))
-const OwnerBookingsPage = lazy(() => import('./pages/OwnerBookingsPage').then(m => ({ default: m.OwnerBookingsPage })))
 
 function App() {
   return (
@@ -31,7 +30,6 @@ function App() {
                 <Route path="/locations/:slug" element={<LocationDetailPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/my-locations" element={<MyLocationsPage />} />
-                <Route path="/my-locations/bookings" element={<OwnerBookingsPage />} />
                 <Route path="/my-bookings" element={<MyBookingsPage />} />
                 <Route element={<AdminGuard />}>
                   <Route path="/admin/locations" element={<AdminLocationsPage />} />
