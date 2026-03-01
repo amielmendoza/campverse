@@ -73,18 +73,26 @@ export function useMessages(locationId: string | undefined) {
     return mapRows(data as MessageRow[])
   }, [locationId])
 
+  // Stable refs for values used inside effects (prevents channel churn)
+  const userRef = useRef(user)
+  userRef.current = user
+  const locationIdRef = useRef(locationId)
+  locationIdRef.current = locationId
+
   // Mark chat as read — fire-and-forget with proper error handling
   const markAsRead = useCallback(() => {
-    if (!user || !locationId) return
+    const u = userRef.current
+    const lid = locationIdRef.current
+    if (!u || !lid) return
     supabase
       .from('location_memberships')
       .update({ last_read_at: new Date().toISOString() })
-      .eq('user_id', user.id)
-      .eq('location_id', locationId)
+      .eq('user_id', u.id)
+      .eq('location_id', lid)
       .then(({ error }) => {
         if (error) console.warn('Failed to mark as read:', error.message)
       })
-  }, [user, locationId])
+  }, []) // stable — reads from refs
 
   // Initial load
   useEffect(() => {
@@ -152,15 +160,16 @@ export function useMessages(locationId: string | undefined) {
     }
   }, [locationId, fetchMessages, markAsRead])
 
-  // Send: optimistic update + refetch for confirmation
+  // Send: optimistic update + verified insert
   const sendMessage = useCallback(
     async (content: string) => {
       if (!user) throw new Error('Must be signed in to send a message')
       if (!locationId) throw new Error('No location specified')
 
       // Optimistic: add message to the list immediately
+      const optimisticId = `optimistic-${Date.now()}`
       const optimisticMsg: MessageWithProfile = {
-        id: `optimistic-${Date.now()}`,
+        id: optimisticId,
         location_id: locationId,
         user_id: user.id,
         content,
@@ -173,27 +182,34 @@ export function useMessages(locationId: string | undefined) {
       }
       setMessages((prev) => [...prev, optimisticMsg])
 
-      const { error } = await supabase
+      // Use .select() to confirm the row was actually inserted (detects silent RLS rejections)
+      const { data: inserted, error } = await supabase
         .from('messages')
         .insert({
           location_id: locationId,
           user_id: user.id,
           content,
         })
+        .select('id')
+        .single()
 
-      if (error) {
+      if (error || !inserted) {
+        console.error('Message insert failed:', error)
         // Rollback optimistic update
-        setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id))
-        throw error
+        setMessages((prev) => prev.filter((m) => m.id !== optimisticId))
+        throw error ?? new Error('Message was not saved')
       }
 
-      // Refetch to replace optimistic message with real data
-      const result = await fetchMessages()
-      if (result) setMessages(result)
+      // Replace optimistic ID with real ID so polling/realtime won't duplicate
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === optimisticId ? { ...m, id: inserted.id } : m,
+        ),
+      )
 
       markAsRead()
     },
-    [user, locationId, fetchMessages, profile, markAsRead],
+    [user, locationId, profile, markAsRead],
   )
 
   return { messages, loading, sendMessage }
