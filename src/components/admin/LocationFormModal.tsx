@@ -145,7 +145,7 @@ export function LocationFormModal({
   }
 
   function addRateOption() {
-    setRateOptions([...rateOptions, { label: '', price: 0, per: 'night' }])
+    setRateOptions([...rateOptions, { label: '', price: 0, per: 'night' as string }])
   }
 
   function updateRateOption(index: number, field: keyof RateOption, value: string | number) {
@@ -612,8 +612,8 @@ export function LocationFormModal({
                           value={opt.label}
                           onChange={(e) => updateRateOption(i, 'label', e.target.value)}
                           disabled={submitting}
-                          className={inputClassName}
-                          placeholder="e.g. Tent Rental, Per Person"
+                          className={inputClassName + ' flex-1'}
+                          placeholder="Label (e.g. Tent Rental)"
                         />
                         <div className="relative shrink-0">
                           <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-stone-400">PHP</span>
@@ -628,15 +628,17 @@ export function LocationFormModal({
                             placeholder="0"
                           />
                         </div>
-                        <select
-                          value={opt.per}
-                          onChange={(e) => updateRateOption(i, 'per', e.target.value)}
-                          disabled={submitting}
-                          className={inputClassName + ' w-28 shrink-0'}
-                        >
-                          <option value="night">/ night</option>
-                          <option value="stay">/ stay</option>
-                        </select>
+                        <div className="relative shrink-0">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-stone-400">/</span>
+                          <input
+                            type="text"
+                            value={opt.per}
+                            onChange={(e) => updateRateOption(i, 'per', e.target.value)}
+                            disabled={submitting}
+                            className={inputClassName + ' w-28 pl-6'}
+                            placeholder="night"
+                          />
+                        </div>
                         <button
                           type="button"
                           onClick={() => removeRateOption(i)}

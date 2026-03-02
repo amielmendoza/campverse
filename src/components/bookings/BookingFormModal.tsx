@@ -60,8 +60,7 @@ export function BookingFormModal({ isOpen, onClose, onSubmit, onMarkPaid, locati
     .filter((s) => s.quantity > 0)
 
   const totalPrice = selections.reduce((sum, s) => {
-    const multiplier = s.per === 'night' ? nights : 1
-    return sum + s.price * s.quantity * multiplier
+    return sum + s.price * s.quantity * nights
   }, 0)
 
   function setQuantity(index: number, value: number) {
@@ -200,11 +199,10 @@ export function BookingFormModal({ isOpen, onClose, onSubmit, onMarkPaid, locati
               <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
                 <div className="space-y-1 text-sm text-stone-600">
                   {selections.map((s, i) => {
-                    const multiplier = s.per === 'night' ? nights : 1
-                    const lineTotal = s.price * s.quantity * multiplier
+                    const lineTotal = s.price * s.quantity * nights
                     return (
                       <div key={i} className="flex justify-between">
-                        <span>{s.label} x {s.quantity}{s.per === 'night' ? ` x ${nights} night${nights > 1 ? 's' : ''}` : ''}</span>
+                        <span>{s.label} x {s.quantity} x {nights} night{nights > 1 ? 's' : ''}</span>
                         <span>PHP {lineTotal.toLocaleString()}</span>
                       </div>
                     )

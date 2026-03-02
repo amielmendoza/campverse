@@ -13,7 +13,7 @@ export type BookingStatus = Booking['status']
 export interface RateOption {
   label: string
   price: number
-  per: 'night' | 'stay'
+  per: string
 }
 
 export interface RateSelection extends RateOption {
