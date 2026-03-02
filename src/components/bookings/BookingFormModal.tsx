@@ -44,7 +44,6 @@ export function BookingFormModal({ isOpen, onClose, onSubmit, onMarkPaid, locati
 
   const [checkIn, setCheckIn] = useState(today)
   const [checkOut, setCheckOut] = useState('')
-  const [guests, setGuests] = useState('1')
   const [quantities, setQuantities] = useState<Record<number, number>>({})
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -83,15 +82,6 @@ export function BookingFormModal({ isOpen, onClose, onSubmit, onMarkPaid, locati
       setError('Check-in date cannot be in the past.')
       return
     }
-    const guestCount = parseInt(guests, 10)
-    if (!guestCount || guestCount < 1) {
-      setError('At least 1 guest is required.')
-      return
-    }
-    if (location.capacity && guestCount > location.capacity) {
-      setError(`This campsite has a maximum capacity of ${location.capacity} guests.`)
-      return
-    }
     if (selections.length === 0) {
       setError('Please select at least one rate option.')
       return
@@ -99,7 +89,7 @@ export function BookingFormModal({ isOpen, onClose, onSubmit, onMarkPaid, locati
 
     setSubmitting(true)
     try {
-      const id = await onSubmit(checkIn, checkOut, guestCount, totalPrice, selections)
+      const id = await onSubmit(checkIn, checkOut, 1, totalPrice, selections)
       setBookingId(id)
       setStep('payment')
     } catch (err) {
@@ -128,7 +118,6 @@ export function BookingFormModal({ isOpen, onClose, onSubmit, onMarkPaid, locati
     setError(null)
     setCheckIn(today)
     setCheckOut('')
-    setGuests('1')
     setQuantities({})
     setBookingId(null)
     setReceiptUrl(null)
@@ -308,26 +297,6 @@ export function BookingFormModal({ isOpen, onClose, onSubmit, onMarkPaid, locati
                     className={inputClassName}
                   />
                 </div>
-              </div>
-
-              {/* Guests */}
-              <div>
-                <label htmlFor="book-guests" className={labelClassName}>
-                  Number of Guests <span className="text-red-500">*</span>
-                </label>
-                <input
-                  id="book-guests"
-                  type="number"
-                  min="1"
-                  max={location.capacity ?? undefined}
-                  value={guests}
-                  onChange={(e) => setGuests(e.target.value)}
-                  disabled={submitting}
-                  className={inputClassName}
-                />
-                {location.capacity && (
-                  <p className="mt-1 text-xs text-stone-400">Maximum capacity: {location.capacity}</p>
-                )}
               </div>
 
               {/* Rate options */}
