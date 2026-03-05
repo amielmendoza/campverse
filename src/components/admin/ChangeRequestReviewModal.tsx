@@ -64,7 +64,9 @@ const BOOLEAN_FIELDS = new Set(['is_active'])
 // Fields that are numeric
 const NUMBER_FIELDS = new Set(['latitude', 'longitude', 'capacity', 'price_per_night'])
 // Fields that are complex (arrays/objects) — shown as JSON
-const COMPLEX_FIELDS = new Set(['amenities', 'gallery', 'rate_options'])
+const COMPLEX_FIELDS = new Set(['amenities', 'gallery'])
+// Fields displayed as read-only formatted text (not editable)
+const READONLY_FIELDS = new Set(['rate_options'])
 
 function renderEditableInput(
   field: string,
@@ -84,6 +86,14 @@ function renderEditableInput(
       >
         {value ? 'Yes' : 'No'}
       </button>
+    )
+  }
+
+  if (READONLY_FIELDS.has(field)) {
+    return (
+      <p className="whitespace-pre-wrap rounded bg-emerald-50 px-3 py-2 text-sm text-stone-700">
+        {formatValue(value)}
+      </p>
     )
   }
 
