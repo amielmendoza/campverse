@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 
@@ -7,18 +7,20 @@ export function Navbar() {
   const { profile, isAdmin, ownedLocationIds, signOut } = useAuth()
   const [pendingCount, setPendingCount] = useState(0)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  const location = useLocation()
 
-  // Fetch pending approval count for admins + subscribe to changes
+  const fetchPendingCount = useCallback(() => {
+    if (!isAdmin) return
+    supabase
+      .from('location_change_requests')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pending')
+      .then(({ count }) => setPendingCount(count ?? 0))
+  }, [isAdmin])
+
+  // Subscribe to realtime changes
   useEffect(() => {
     if (!isAdmin) return
-
-    const fetchPendingCount = () => {
-      supabase
-        .from('location_change_requests')
-        .select('id, locations!location_id!inner(id)', { count: 'exact', head: true })
-        .eq('status', 'pending')
-        .then(({ count }) => setPendingCount(count ?? 0))
-    }
 
     fetchPendingCount()
 
@@ -39,7 +41,23 @@ export function Navbar() {
         channelRef.current = null
       }
     }
-  }, [isAdmin])
+  }, [isAdmin, fetchPendingCount])
+
+  // Refetch on route changes and window focus (fallback if realtime misses)
+  useEffect(() => {
+    fetchPendingCount()
+  }, [location.pathname, fetchPendingCount])
+
+  useEffect(() => {
+    const onFocus = () => fetchPendingCount()
+    const onChangeRequestsUpdated = () => fetchPendingCount()
+    window.addEventListener('focus', onFocus)
+    window.addEventListener('change-requests-updated', onChangeRequestsUpdated)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      window.removeEventListener('change-requests-updated', onChangeRequestsUpdated)
+    }
+  }, [fetchPendingCount])
   const navigate = useNavigate()
 
   const handleSignOut = async () => {

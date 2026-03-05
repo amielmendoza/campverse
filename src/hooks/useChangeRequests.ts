@@ -163,6 +163,7 @@ export function useChangeRequests() {
 
       invalidateCacheKey('locations:list')
       await fetchRequests()
+      window.dispatchEvent(new Event('change-requests-updated'))
       }) // end guardedMutation
     },
     [user, fetchRequests],
@@ -209,6 +210,7 @@ export function useChangeRequests() {
       }
 
       await fetchRequests()
+      window.dispatchEvent(new Event('change-requests-updated'))
       }) // end guardedMutation
     },
     [user, fetchRequests],
