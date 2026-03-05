@@ -41,6 +41,17 @@ function formatValue(value: unknown): string {
     if (value[0] && typeof value[0] === 'object' && 'name' in value[0]) {
       return value.map((a) => (a as { name: string }).name).join(', ')
     }
+    // Check if rate_options array
+    if (value[0] && typeof value[0] === 'object' && 'label' in value[0]) {
+      return value.map((r) => {
+        const opt = r as { label: string; price: number; per: string }
+        return `${opt.label} — PHP ${opt.price} / ${opt.per}`
+      }).join('\n')
+    }
+    // Fallback for arrays of objects
+    if (value[0] && typeof value[0] === 'object') {
+      return JSON.stringify(value, null, 2)
+    }
     return value.join(', ')
   }
   return String(value)
@@ -270,7 +281,7 @@ export function ChangeRequestReviewModal({
                           </p>
                         </div>
                       ) : (
-                        <p className="rounded bg-red-50 px-3 py-2 text-sm text-stone-700">
+                        <p className="whitespace-pre-wrap rounded bg-red-50 px-3 py-2 text-sm text-stone-700">
                           {formatValue(currentVal)}
                         </p>
                       )}

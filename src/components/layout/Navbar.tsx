@@ -15,7 +15,7 @@ export function Navbar() {
     const fetchPendingCount = () => {
       supabase
         .from('location_change_requests')
-        .select('id', { count: 'exact', head: true })
+        .select('id, locations!location_id!inner(id)', { count: 'exact', head: true })
         .eq('status', 'pending')
         .then(({ count }) => setPendingCount(count ?? 0))
     }
